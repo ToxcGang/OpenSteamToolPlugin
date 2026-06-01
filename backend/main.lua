@@ -91,7 +91,7 @@ local function on_load()
 
     local keys = {}
     for k, v in pairs(millennium) do table.insert(keys, k .. ":" .. type(v)) end
-    logger.warn("MILLENNIUM KEYS: " .. table.concat(keys, ", "))
+    logger.log("MILLENNIUM KEYS: " .. table.concat(keys, ", "))
 end
 
 local function on_unload()
@@ -208,6 +208,62 @@ function AddCustomApi(api_key, contentScriptQuery, name, url)
         api_key = tostring(api_key or "")
     }
     local ok, res = pcall(api_manifest.add_custom_api, payload)
+    if not ok then return json_err(res) end
+    return json_ok(res)
+end
+
+function GetAllApis()
+    local ok, res = pcall(api_manifest.get_all_apis)
+    if not ok then return json_err(res) end
+    return json_ok(res)
+end
+
+function ToggleApi(params, contentScriptQuery)
+    local apiName = params
+    if type(params) == "table" then apiName = params.apiName or params.name end
+    local ok, res = pcall(api_manifest.toggle_api, tostring(apiName or ""))
+    if not ok then return json_err(res) end
+    return json_ok(res)
+end
+
+function RemoveApi(params, contentScriptQuery)
+    local apiName = params
+    if type(params) == "table" then apiName = params.apiName or params.name end
+    local ok, res = pcall(api_manifest.remove_api, tostring(apiName or ""))
+    if not ok then return json_err(res) end
+    return json_ok(res)
+end
+
+function RenameApi(params, contentScriptQuery)
+    local old_name, new_name
+    if type(params) == "table" then
+        new_name = params.new_name
+        old_name = params.old_name or params.apiName or params.name
+    else
+        -- If somehow positional
+        old_name = params
+    end
+    local ok, res = pcall(api_manifest.rename_api, tostring(old_name or ""), tostring(new_name or ""))
+    if not ok then return json_err(res) end
+    return json_ok(res)
+end
+
+function ReorderApis(params, contentScriptQuery)
+    local names = params
+    if type(params) == "table" and params.apiNames then
+        names = params.apiNames
+    end
+    -- Millennium's Lua bridge doesn't deep-deserialize nested JSON arrays/objects
+    if type(names) == "string" then
+        local ok, parsed = pcall(cjson.decode, names)
+        if ok and type(parsed) == "table" then
+            names = parsed
+        end
+    end
+    if type(names) ~= "table" then
+        return json_ok({ success = false, error = "Invalid argument, got type: " .. type(names) })
+    end
+    local ok, res = pcall(api_manifest.set_api_order, names)
     if not ok then return json_err(res) end
     return json_ok(res)
 end
@@ -471,14 +527,14 @@ end
 
 function GetThemes()
     local themes_json_path = fs.join(paths.get_plugin_dir(), "public", "themes", "themes.json")
-    local themes_list = {}
+    local themes_dict = {}
 
     if fs.exists(themes_json_path) then
         local success, data = pcall(cjson.decode, utils.read_text(themes_json_path))
         if success and type(data) == "table" then
             for _, item in ipairs(data) do
                 if type(item) == "table" and item.value then
-                    table.insert(themes_list, item)
+                    themes_dict[item.value] = item
                 end
             end
         else
@@ -488,7 +544,7 @@ function GetThemes()
         logger.warn("GetThemes: themes.json not found")
     end
 
-    return json_ok({ success = true, themes = themes_list })
+    return json_ok({ success = true, themes = themes_dict })
 end
 
 function ApplySettingsChanges(changes)

@@ -709,6 +709,38 @@
 
   // Cache for game names fetched from Steam API
   const steamGameNameCache = {};
+  // Track in-flight promises so we don't fire duplicate requests for the same appid
+  const steamGameNameInFlight = {};
+  // Throttle: max 2 concurrent fetch calls to avoid overwhelming Millennium's network interceptor
+  let _steamFetchActive = 0;
+  const _steamFetchQueue = [];
+  const _STEAM_FETCH_CONCURRENCY = 2;
+
+  function _runSteamFetchQueue() {
+    if (_steamFetchActive >= _STEAM_FETCH_CONCURRENCY || _steamFetchQueue.length === 0) return;
+    const { appid, resolve, reject } = _steamFetchQueue.shift();
+    _steamFetchActive++;
+    fetch(
+      "https://store.steampowered.com/api/appdetails?appids=" + appid + "&filters=basic"
+    )
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        let name = null;
+        if (data && data[appid] && data[appid].success && data[appid].data && data[appid].data.name) {
+          name = data[appid].data.name;
+          steamGameNameCache[appid] = name;
+        }
+        resolve(name);
+      })
+      .catch(function(err) {
+        resolve(null);
+      })
+      .finally(function() {
+        _steamFetchActive--;
+        delete steamGameNameInFlight[appid];
+        _runSteamFetchQueue();
+      });
+  }
 
   /**
    * get game name separately without cached full appid
@@ -717,37 +749,16 @@
    */
   function fetchSteamGameName(appid) {
     if (!appid) return Promise.resolve(null);
-    if (steamGameNameCache[appid])
-      return Promise.resolve(steamGameNameCache[appid]);
+    if (steamGameNameCache[appid]) return Promise.resolve(steamGameNameCache[appid]);
+    // Deduplicate: return the same promise if already in-flight
+    if (steamGameNameInFlight[appid]) return steamGameNameInFlight[appid];
 
-    return fetch(
-      "https://store.steampowered.com/api/appdetails?appids=" +
-        appid +
-        "&filters=basic",
-    )
-      .then(function (res) {
-        return res.json();
-      })
-      .then(function (data) {
-        if (
-          data &&
-          data[appid] &&
-          data[appid].success &&
-          data[appid].data &&
-          data[appid].data.name
-        ) {
-          const name = data[appid].data.name;
-          steamGameNameCache[appid] = name;
-          return name;
-        }
-        return null;
-      })
-      .catch(function (err) {
-        backendLog(
-          "LuaTools: fetchSteamGameName error for " + appid + ": " + err,
-        );
-        return null;
-      });
+    const promise = new Promise(function(resolve, reject) {
+      _steamFetchQueue.push({ appid: appid, resolve: resolve, reject: reject });
+      _runSteamFetchQueue();
+    });
+    steamGameNameInFlight[appid] = promise;
+    return promise;
   }
 
   const TRANSLATION_PLACEHOLDER = "translation missing";
@@ -1246,7 +1257,7 @@
     }
   }
 
-  function showCustomApiModal() {
+  function showCustomApiModal(onSuccess) {
     try {
       const old = document.querySelector(".luatools-custom-api-overlay");
       if (old) old.remove();
@@ -1408,7 +1419,11 @@
           const payload = typeof res === "string" ? JSON.parse(res) : res;
           if (payload && payload.success) {
             overlay.remove();
-            ShowLuaToolsAlert("Success", lt("Custom API added successfully!"));
+            if (typeof onSuccess === "function") {
+              onSuccess();
+            } else {
+              ShowLuaToolsAlert("Success", lt("Custom API added successfully!"));
+            }
           } else {
             saveBtn.textContent = lt("Save API");
             saveBtn.disabled = false;
@@ -3618,6 +3633,11 @@
       config: null,
       draft: {},
       searchQuery: "",
+      fixes: [],
+      fixesPage: 1,
+      luas: [],
+      luasPage: 1,
+      luasPerPage: 10
     };
 
     // Search functionality
@@ -3670,80 +3690,16 @@
         }
       });
 
-      // Filter installed fixes
-      const fixItems = contentWrap.querySelectorAll("[data-fix-item]");
-      let visibleFixes = 0;
-      fixItems.forEach(function (el) {
-        const searchText = (el.dataset.searchText || "").toLowerCase();
-        if (!query || searchText.includes(query)) {
-          el.style.display = "";
-          visibleFixes++;
-        } else {
-          el.style.display = "none";
-        }
-      });
-
-      // Show/hide fixes empty state
-      const fixesSection = document.getElementById(
-        "luatools-installed-fixes-section",
-      );
-      const fixesEmptySearch = fixesSection
-        ? fixesSection.querySelector(".search-empty-state")
-        : null;
-      if (fixesSection && query && fixItems.length > 0 && visibleFixes === 0) {
-        if (!fixesEmptySearch) {
-          const emptyEl = document.createElement("div");
-          emptyEl.className = "search-empty-state";
-          const emptyColors = getThemeColors();
-          emptyEl.style.cssText = `padding:14px;background:${emptyColors.bgTertiary};border:1px solid ${emptyColors.border};border-radius:4px;color:${emptyColors.textSecondary};text-align:center;margin-top:10px;`;
-          emptyEl.textContent = t(
-            "settings.search.noResults",
-            "No matches found",
-          );
-          const listContainer = fixesSection.querySelector(
-            "#luatools-fixes-list",
-          );
-          if (listContainer) listContainer.appendChild(emptyEl);
-        }
-      } else if (fixesEmptySearch) {
-        fixesEmptySearch.remove();
+      // Filter installed fixes via pagination
+      state.fixesPage = 1;
+      if (typeof renderFixesList === "function") {
+        renderFixesList();
       }
 
-      // Filter installed lua scripts
-      const luaItems = contentWrap.querySelectorAll("[data-lua-item]");
-      let visibleLua = 0;
-      luaItems.forEach(function (el) {
-        const searchText = (el.dataset.searchText || "").toLowerCase();
-        if (!query || searchText.includes(query)) {
-          el.style.display = "";
-          visibleLua++;
-        } else {
-          el.style.display = "none";
-        }
-      });
-
-      // Show/hide lua empty state
-      const luaSection = document.getElementById(
-        "luatools-installed-lua-section",
-      );
-      const luaEmptySearch = luaSection
-        ? luaSection.querySelector(".search-empty-state")
-        : null;
-      if (luaSection && query && luaItems.length > 0 && visibleLua === 0) {
-        if (!luaEmptySearch) {
-          const emptyEl = document.createElement("div");
-          emptyEl.className = "search-empty-state";
-          const emptyColors = getThemeColors();
-          emptyEl.style.cssText = `padding:14px;background:${emptyColors.bgTertiary};border:1px solid ${emptyColors.border};border-radius:4px;color:${emptyColors.textSecondary};text-align:center;margin-top:10px;`;
-          emptyEl.textContent = t(
-            "settings.search.noResults",
-            "No matches found",
-          );
-          const listContainer = luaSection.querySelector("#luatools-lua-list");
-          if (listContainer) listContainer.appendChild(emptyEl);
-        }
-      } else if (luaEmptySearch) {
-        luaEmptySearch.remove();
+      // Filter installed lua scripts via pagination
+      state.luasPage = 1;
+      if (typeof renderLuaList === "function") {
+        renderLuaList();
       }
     }
 
@@ -4464,6 +4420,9 @@
         contentWrap.appendChild(groupEl);
       }
 
+      // Render API Toggles section
+      renderApiTogglesSection();
+
       // Render Installed Fixes section
       renderInstalledFixesSection();
 
@@ -4517,6 +4476,78 @@
       loadInstalledFixes(listContainer);
     }
 
+    function renderFixesList() {
+      const container = document.getElementById("luatools-fixes-list");
+      if (!container) return;
+
+      const query = state.searchQuery || "";
+      const filteredFixes = state.fixes.filter(function(fix) {
+          if (!query) return true;
+          const gameNameText = fix.gameName || "Unknown Game";
+          const searchText = (gameNameText + " " + fix.appid + " " + (fix.fixType || "") + " fix").toLowerCase();
+          return searchText.includes(query);
+      });
+
+      const itemsPerPage = 10;
+      const totalPages = Math.max(1, Math.ceil(filteredFixes.length / itemsPerPage));
+      if (state.fixesPage < 1) state.fixesPage = 1;
+      if (state.fixesPage > totalPages) state.fixesPage = totalPages;
+
+      container.innerHTML = "";
+
+      if (filteredFixes.length === 0) {
+        const emptyColors = getThemeColors();
+        const msg = query ? t("settings.search.noResults", "No matches found") : t("settings.installedFixes.empty", "No fixes installed yet.");
+        container.innerHTML = `<div class="search-empty-state" style="padding:16px;background:rgba(${emptyColors.rgbString},0.03);border:1px solid ${emptyColors.border};border-radius:8px;color:${emptyColors.textSecondary};text-align:center;font-size:13px;">${msg}</div>`;
+        return;
+      }
+
+      const startIndex = (state.fixesPage - 1) * itemsPerPage;
+      const pageItems = filteredFixes.slice(startIndex, startIndex + itemsPerPage);
+
+      for (let i = 0; i < pageItems.length; i++) {
+        const fix = pageItems[i];
+        const fixEl = createFixListItem(fix, container);
+        container.appendChild(fixEl);
+      }
+
+      if (totalPages > 1) {
+         const paginationDiv = document.createElement("div");
+         paginationDiv.style.cssText = "display:flex;justify-content:center;align-items:center;margin-top:14px;gap:15px;margin-bottom:10px;";
+         
+         const btnColors = getThemeColors();
+         
+         const prevBtn = document.createElement("a");
+         prevBtn.href = "#";
+         prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+         prevBtn.style.cssText = `padding:5px 12px;color:${btnColors.accent};text-decoration:none;border-radius:4px;background:rgba(${btnColors.rgbString},0.1);transition:all 0.15s ease;`;
+         if (state.fixesPage <= 1) {
+            prevBtn.style.opacity = "0.5";
+            prevBtn.style.pointerEvents = "none";
+         }
+         prevBtn.onclick = function(e) { e.preventDefault(); state.fixesPage--; renderFixesList(); };
+
+         const pageInfo = document.createElement("span");
+         pageInfo.style.cssText = `color:${btnColors.textSecondary};font-size:13px;`;
+         pageInfo.textContent = t("settings.pagination", "Page {page} of {total}").replace("{page}", state.fixesPage).replace("{total}", totalPages);
+
+         const nextBtn = document.createElement("a");
+         nextBtn.href = "#";
+         nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+         nextBtn.style.cssText = `padding:5px 12px;color:${btnColors.accent};text-decoration:none;border-radius:4px;background:rgba(${btnColors.rgbString},0.1);transition:all 0.15s ease;`;
+         if (state.fixesPage >= totalPages) {
+            nextBtn.style.opacity = "0.5";
+            nextBtn.style.pointerEvents = "none";
+         }
+         nextBtn.onclick = function(e) { e.preventDefault(); state.fixesPage++; renderFixesList(); };
+
+         paginationDiv.appendChild(prevBtn);
+         paginationDiv.appendChild(pageInfo);
+         paginationDiv.appendChild(nextBtn);
+         container.appendChild(paginationDiv);
+      }
+    }
+
     function loadInstalledFixes(container) {
       const loadingColors = getThemeColors();
       container.innerHTML = `<div style="padding:16px;text-align:center;color:${loadingColors.textSecondary};font-size:13px;">${t("settings.installedFixes.loading", "Scanning for installed fixes...")}</div>`;
@@ -4540,24 +4571,9 @@
             return;
           }
 
-          const fixes = Array.isArray(response.fixes) ? response.fixes : [];
-          if (fixes.length === 0) {
-            const emptyColors = getThemeColors();
-            container.innerHTML = `<div style="padding:16px;background:rgba(255,255,255,0.03);border:1px solid ${emptyColors.border};border-radius:8px;color:${emptyColors.textSecondary};text-align:center;font-size:13px;">${t("settings.installedFixes.empty", "No fixes installed yet.")}</div>`;
-            return;
-          }
-
-          container.innerHTML = "";
-          for (let i = 0; i < fixes.length; i++) {
-            const fix = fixes[i];
-            const fixEl = createFixListItem(fix, container);
-            container.appendChild(fixEl);
-          }
-
-          // Re-apply search filter after loading
-          if (state.searchQuery) {
-            setTimeout(applySearchFilter, 50);
-          }
+          state.fixes = Array.isArray(response.fixes) ? response.fixes : [];
+          state.fixesPage = 1;
+          renderFixesList();
         })
         .catch(function (err) {
           backendLog("LuaTools: GetInstalledFixes catch error: " + err);
@@ -4826,19 +4842,399 @@
       checkStatus();
     }
 
+    function renderApiTogglesSection() {
+      const c = getThemeColors();
+      const sectionEl = document.createElement("div");
+      sectionEl.id = "luatools-api-toggles-section";
+      sectionEl.style.cssText = `margin-top:28px;padding:20px;background:rgba(${c.rgbString},0.04);border:1px solid ${c.border};border-radius:10px;`;
+
+      const sectionTitle = document.createElement("div");
+      sectionTitle.style.cssText = `font-size:16px;color:${c.text};margin-bottom:6px;font-weight:600;`;
+      sectionTitle.innerHTML = '<i class="fa-solid fa-plug" style="margin-right:8px;color:' + c.accent + ';"></i>' + t("settings.apiToggles.title", "Download Sources");
+      sectionEl.appendChild(sectionTitle);
+
+      const sectionDesc = document.createElement("div");
+      sectionDesc.style.cssText = `font-size:12px;color:${c.textSecondary};margin-bottom:14px;`;
+      sectionDesc.textContent = t("settings.apiToggles.desc", "Toggle which download sources are active. Click a name to rename. Disabled sources will be skipped.");
+      sectionEl.appendChild(sectionDesc);
+
+      const listEl = document.createElement("div");
+      listEl.id = "luatools-api-list";
+      listEl.innerHTML = `<div style="padding:10px;text-align:center;color:${c.textSecondary};font-size:13px;">Loading...</div>`;
+      sectionEl.appendChild(listEl);
+
+      contentWrap.appendChild(sectionEl);
+
+      Millennium.callServerMethod("luatools", "GetAllApis", { contentScriptQuery: "" })
+        .then(function(res) {
+          const payload = typeof res === "string" ? JSON.parse(res) : res;
+          if (!payload || !payload.success || !Array.isArray(payload.apis)) {
+            alert("Payload error in GetAllApis: " + JSON.stringify(payload));
+            listEl.innerHTML = `<div style="color:#ff5c5c;font-size:13px;padding:10px;">${t("settings.apiToggles.error", "Failed to load APIs.")}</div>`;
+            return;
+          }
+          listEl.innerHTML = "";
+          if (payload.apis.length === 0) {
+            listEl.innerHTML = `<div style="color:${getThemeColors().textSecondary};font-size:13px;padding:10px;">${t("settings.apiToggles.empty", "No APIs configured.")}</div>`;
+          } else {
+          payload.apis.forEach(function(api) {
+            // currentName tracks renames so other ops reference the right key
+            let currentName = api.name;
+
+            const row = document.createElement("div");
+            const rc = getThemeColors();
+            row.style.cssText = `display:flex;align-items:center;gap:10px;padding:10px 12px;background:rgba(${rc.rgbString},0.04);border:1px solid ${rc.border};border-radius:8px;margin-bottom:8px;transition:all 0.2s ease;`;
+            row.draggable = false;
+            
+            // Reorder tracking
+            // Since currentName can change if the user renames the API, we update dataset.apiName on rename
+            row.dataset.apiName = currentName;
+
+            // Drag Events
+            row.addEventListener('dragstart', function(e) {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', currentName);
+                row.classList.add('luatools-dragging');
+                row.style.opacity = '0.5';
+            });
+            row.addEventListener('dragend', function() {
+                row.classList.remove('luatools-dragging');
+                row.style.opacity = '1';
+                row.draggable = false;
+                Array.from(listEl.children).forEach(function(c) {
+                  if(c.dataset.apiName) {
+                     c.style.borderTopColor = rc.border;
+                     c.style.borderBottomColor = rc.border;
+                  }
+                });
+                
+                // Collect new order and save ONLY once drag is completed
+                const newOrder = Array.from(listEl.children)
+                  .filter(function(c) { return c.dataset.apiName; })
+                  .map(function(c) { return c.dataset.apiName; });
+                
+                Millennium.callServerMethod("luatools", "ReorderApis", { apiNames: JSON.stringify(newOrder), contentScriptQuery: "" })
+                  .then(function(r) {
+                    const rp = typeof r === "string" ? JSON.parse(r) : r;
+                    if (!rp || !rp.success) {
+                        alert("ReorderApis Failed: " + JSON.stringify(rp));
+                    }
+                  })
+                  .catch(function(err){ alert("ReorderApis Error: " + err); });
+            });
+            row.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                const dragging = listEl.querySelector('.luatools-dragging');
+                if (dragging && dragging !== row) {
+                   const bounding = row.getBoundingClientRect();
+                   const offset = bounding.y + (bounding.height / 2);
+                   if (e.clientY - offset > 0) {
+                      row.style.borderBottomColor = rc.accent;
+                      row.style.borderTopColor = rc.border;
+                   } else {
+                      row.style.borderTopColor = rc.accent;
+                      row.style.borderBottomColor = rc.border;
+                   }
+                }
+                return false;
+            });
+            row.addEventListener('dragleave', function(e) {
+                row.style.borderTopColor = rc.border;
+                row.style.borderBottomColor = rc.border;
+            });
+            row.addEventListener('drop', function(e) {
+                e.stopPropagation();
+                row.style.borderTopColor = rc.border;
+                row.style.borderBottomColor = rc.border;
+
+                const dragging = listEl.querySelector('.luatools-dragging');
+                if (dragging && dragging !== row) {
+                   const bounding = row.getBoundingClientRect();
+                   const offset = bounding.y + (bounding.height / 2);
+                   if (e.clientY - offset > 0) {
+                      row.after(dragging);
+                   } else {
+                      row.before(dragging);
+                   }
+                }
+                return false;
+            });
+
+            // ── Drag handle ────────────────────────────────────────────
+            const handle = document.createElement("div");
+            handle.innerHTML = '<i class="fa-solid fa-grip-vertical"></i>';
+            handle.style.cssText = `color:${rc.textSecondary};cursor:grab;padding:0 5px;font-size:14px;opacity:0.5;transition:opacity 0.2s;`;
+            handle.onmouseover = function() { this.style.opacity = "1"; };
+            handle.onmouseout = function() { this.style.opacity = "0.5"; };
+            handle.onmousedown = function() { row.draggable = true; };
+            handle.onmouseup = function() { row.draggable = false; };
+            handle.onmouseleave = function() { row.draggable = false; };
+            row.appendChild(handle);
+
+            // ── Editable name ──────────────────────────────────────────
+            const nameWrap = document.createElement("div");
+            nameWrap.style.cssText = "flex:1;min-width:0;";
+
+            const nameDisplay = document.createElement("span");
+            nameDisplay.style.cssText = `font-size:14px;color:${rc.text};font-weight:500;cursor:pointer;border-bottom:1px dashed transparent;transition:border-color 0.15s;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;`;
+            nameDisplay.title = t("settings.apiToggles.clickToRename", "Click to rename");
+            nameDisplay.textContent = currentName;
+            nameDisplay.onmouseover = function() { this.style.borderBottomColor = getThemeColors().accent; };
+            nameDisplay.onmouseout  = function() { this.style.borderBottomColor = "transparent"; };
+
+            nameDisplay.onclick = function() {
+              // Switch to input
+              const input = document.createElement("input");
+              input.type = "text";
+              input.value = currentName;
+              const ic = getThemeColors();
+              input.style.cssText = `font-size:14px;font-weight:500;color:${ic.text};background:rgba(${ic.rgbString},0.12);border:1px solid ${ic.accent};border-radius:4px;padding:2px 8px;outline:none;width:100%;box-sizing:border-box;`;
+              nameWrap.replaceChild(input, nameDisplay);
+              input.focus();
+              input.select();
+
+              function commitRename() {
+                const newVal = input.value.trim();
+                if (newVal && newVal !== currentName) {
+                  Millennium.callServerMethod("luatools", "RenameApi", { old_name: currentName, new_name: newVal, contentScriptQuery: "" })
+                    .then(function(r) {
+                      const rp = typeof r === "string" ? JSON.parse(r) : r;
+                      if (rp && rp.success) {
+                        currentName = newVal;
+                        row.dataset.apiName = newVal;
+                        nameDisplay.textContent = newVal;
+                      }
+                    }).catch(function() {});
+                }
+                nameDisplay.textContent = currentName;
+                nameWrap.replaceChild(nameDisplay, input);
+              }
+
+              input.onblur = commitRename;
+              input.onkeydown = function(e) {
+                if (e.key === "Enter") { e.preventDefault(); commitRename(); }
+                if (e.key === "Escape") { nameWrap.replaceChild(nameDisplay, input); }
+              };
+            };
+
+            nameWrap.appendChild(nameDisplay);
+            row.appendChild(nameWrap);
+
+            // ── Toggle pill ────────────────────────────────────────────
+            const pill = document.createElement("div");
+            const isEnabled = api.enabled !== false;
+            pill.style.cssText = `width:42px;height:22px;border-radius:11px;cursor:pointer;transition:background 0.2s ease;background:${isEnabled ? rc.accent : "rgba(255,255,255,0.15)"};position:relative;flex-shrink:0;`;
+            const knob = document.createElement("div");
+            knob.style.cssText = `position:absolute;top:3px;left:${isEnabled ? "22px" : "3px"};width:16px;height:16px;border-radius:50%;background:#fff;transition:left 0.2s ease;box-shadow:0 1px 3px rgba(0,0,0,0.4);`;
+            pill.appendChild(knob);
+            pill.dataset.enabled = isEnabled ? "1" : "0";
+            pill.title = t("settings.apiToggles.toggle", "Enable / disable");
+
+            pill.onclick = function() {
+              const nowEnabled = pill.dataset.enabled !== "1";
+              pill.dataset.enabled = nowEnabled ? "1" : "0";
+              const tc = getThemeColors();
+              pill.style.background = nowEnabled ? tc.accent : "rgba(255,255,255,0.15)";
+              knob.style.left = nowEnabled ? "22px" : "3px";
+              Millennium.callServerMethod("luatools", "ToggleApi", { apiName: currentName, contentScriptQuery: "" })
+                .then(function(r) {
+                  const rp = typeof r === "string" ? JSON.parse(r) : r;
+                  if (!rp || !rp.success) {
+                    alert("ToggleApi Failed: " + JSON.stringify(rp));
+                    pill.dataset.enabled = nowEnabled ? "0" : "1";
+                    pill.style.background = nowEnabled ? "rgba(255,255,255,0.15)" : getThemeColors().accent;
+                    knob.style.left = nowEnabled ? "3px" : "22px";
+                  }
+                }).catch(function(err) {
+                  alert("ToggleApi Error: " + err);
+                  pill.dataset.enabled = nowEnabled ? "0" : "1";
+                  pill.style.background = nowEnabled ? "rgba(255,255,255,0.15)" : getThemeColors().accent;
+                  knob.style.left = nowEnabled ? "3px" : "22px";
+                });
+            };
+
+            row.appendChild(pill);
+
+            // ── Delete button ──────────────────────────────────────────
+            const delBtn = document.createElement("a");
+            delBtn.href = "#";
+            const dc = getThemeColors();
+            delBtn.style.cssText = `display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:rgba(255,92,92,0.08);border:1px solid rgba(255,92,92,0.25);color:#ff5c5c;font-size:12px;text-decoration:none;flex-shrink:0;transition:all 0.15s ease;cursor:pointer;`;
+            delBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+            delBtn.title = t("settings.apiToggles.remove", "Remove source");
+            delBtn.onmouseover = function() { this.style.background = "rgba(255,92,92,0.2)"; this.style.borderColor = "rgba(255,92,92,0.6)"; };
+            delBtn.onmouseout  = function() { this.style.background = "rgba(255,92,92,0.08)"; this.style.borderColor = "rgba(255,92,92,0.25)"; };
+
+            delBtn.onclick = function(e) {
+              e.preventDefault();
+              if (delBtn.dataset.busy === "1") return;
+              delBtn.dataset.busy = "1";
+              delBtn.style.opacity = "0.5";
+              Millennium.callServerMethod("luatools", "RemoveApi", { apiName: currentName, contentScriptQuery: "" })
+                .then(function(r) {
+                  const rp = typeof r === "string" ? JSON.parse(r) : r;
+                  if (rp && rp.success) {
+                    row.style.opacity = "0";
+                    row.style.transform = "translateX(10px)";
+                    setTimeout(function() { row.remove(); }, 200);
+                  } else {
+                    alert("RemoveApi Failed: " + JSON.stringify(rp));
+                    delBtn.dataset.busy = "0";
+                    delBtn.style.opacity = "1";
+                  }
+                }).catch(function(err) {
+                  alert("RemoveApi Error: " + err);
+                  delBtn.dataset.busy = "0";
+                  delBtn.style.opacity = "1";
+                });
+            };
+
+            row.appendChild(delBtn);
+            listEl.appendChild(row);
+          }); // end forEach
+          } // end else
+
+          // ── Add Source button ──────────────────────────────────────
+          const addBtnRow = document.createElement("div");
+          addBtnRow.style.cssText = "display:flex;justify-content:flex-end;margin-top:10px;";
+          const addBtn = document.createElement("a");
+          addBtn.href = "#";
+          const abc = getThemeColors();
+          addBtn.style.cssText = `display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;background:rgba(${abc.rgbString},0.12);border:1px solid ${abc.border};color:${abc.accent};font-size:13px;font-weight:500;text-decoration:none;transition:all 0.15s ease;cursor:pointer;`;
+          addBtn.innerHTML = '<i class="fa-solid fa-plus"></i><span>' + t("settings.apiToggles.addSource", "Add Source") + '</span>';
+          addBtn.onmouseover = function() { const c = getThemeColors(); this.style.background = `rgba(${c.rgbString},0.22)`; this.style.borderColor = c.accent; };
+          addBtn.onmouseout  = function() { const c = getThemeColors(); this.style.background = `rgba(${c.rgbString},0.12)`; this.style.borderColor = c.border; };
+          addBtn.onclick = function(e) {
+            e.preventDefault();
+            showCustomApiModal(function() {
+              // Reload the API list in-place after a successful add
+              listEl.innerHTML = `<div style="padding:10px;text-align:center;color:${getThemeColors().textSecondary};font-size:13px;">Loading...</div>`;
+              Millennium.callServerMethod("luatools", "GetAllApis", { contentScriptQuery: "" })
+                .then(function(r2) {
+                  const p2 = typeof r2 === "string" ? JSON.parse(r2) : r2;
+                  if (!p2 || !p2.success || !Array.isArray(p2.apis)) { return; }
+                  listEl.innerHTML = "";
+                  p2.apis.forEach(function(a2) {
+                    // Simple read-only rows for the reload (user can reopen settings to get full interactive rows)
+                    const r = document.createElement("div");
+                    const rc = getThemeColors();
+                    r.style.cssText = `padding:10px 12px;background:rgba(${rc.rgbString},0.04);border:1px solid ${rc.border};border-radius:8px;margin-bottom:8px;font-size:14px;color:${rc.text};`;
+                    r.textContent = a2.name;
+                    listEl.insertBefore(r, addBtnRow);
+                  });
+                }).catch(function() {});
+              ShowLuaToolsAlert("Success", lt("Custom API added successfully!"));
+            });
+          };
+          addBtnRow.appendChild(addBtn);
+          sectionEl.appendChild(addBtnRow);
+        })
+        .catch(function(err) {
+          alert("GetAllApis Catch Error: " + err);
+          listEl.innerHTML = `<div style="color:#ff5c5c;font-size:13px;padding:10px;">${t("settings.apiToggles.error", "Failed to load APIs.")}</div>`;
+        });
+    }
+
+    function renderLuaList() {
+      const container = document.getElementById("luatools-lua-list");
+      if (!container) return;
+
+      const query = state.searchQuery || "";
+      const filteredLuas = state.luas.filter(function(s) {
+        if (!query) return true;
+        const gameNameText = s.gameName || "Unknown Game";
+        const searchText = (gameNameText + " " + s.appid + " lua script").toLowerCase();
+        return searchText.includes(query);
+      });
+
+      const itemsPerPage = state.luasPerPage || 10;
+      const totalPages = Math.max(1, Math.ceil(filteredLuas.length / itemsPerPage));
+      if (state.luasPage < 1) state.luasPage = 1;
+      if (state.luasPage > totalPages) state.luasPage = totalPages;
+
+      container.innerHTML = "";
+
+      if (filteredLuas.length === 0) {
+        const ec = getThemeColors();
+        const msg = query ? t("settings.search.noResults", "No matches found") : t("settings.installedLua.empty", "No Lua scripts installed yet.");
+        container.innerHTML = `<div class="search-empty-state" style="padding:16px;background:rgba(${ec.rgbString},0.03);border:1px solid ${ec.border};border-radius:8px;color:${ec.textSecondary};text-align:center;font-size:13px;">${msg}</div>`;
+        return;
+      }
+
+      const startIndex = (state.luasPage - 1) * itemsPerPage;
+      const pageItems = filteredLuas.slice(startIndex, startIndex + itemsPerPage);
+
+      for (let i = 0; i < pageItems.length; i++) {
+        container.appendChild(createLuaListItem(pageItems[i], container));
+      }
+
+      if (totalPages > 1) {
+        const paginationDiv = document.createElement("div");
+        paginationDiv.style.cssText = "display:flex;justify-content:center;align-items:center;margin-top:14px;gap:15px;margin-bottom:10px;";
+        const bc = getThemeColors();
+
+        const prevBtn = document.createElement("a");
+        prevBtn.href = "#";
+        prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+        prevBtn.style.cssText = `padding:5px 12px;color:${bc.accent};text-decoration:none;border-radius:4px;background:rgba(${bc.rgbString},0.1);transition:all 0.15s ease;`;
+        if (state.luasPage <= 1) { prevBtn.style.opacity = "0.5"; prevBtn.style.pointerEvents = "none"; }
+        prevBtn.onclick = function(e) { e.preventDefault(); state.luasPage--; renderLuaList(); };
+
+        const pageInfo = document.createElement("span");
+        pageInfo.style.cssText = `color:${bc.textSecondary};font-size:13px;`;
+        pageInfo.textContent = t("settings.pagination", "Page {page} of {total}").replace("{page}", state.luasPage).replace("{total}", totalPages);
+
+        const nextBtn = document.createElement("a");
+        nextBtn.href = "#";
+        nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+        nextBtn.style.cssText = `padding:5px 12px;color:${bc.accent};text-decoration:none;border-radius:4px;background:rgba(${bc.rgbString},0.1);transition:all 0.15s ease;`;
+        if (state.luasPage >= totalPages) { nextBtn.style.opacity = "0.5"; nextBtn.style.pointerEvents = "none"; }
+        nextBtn.onclick = function(e) { e.preventDefault(); state.luasPage++; renderLuaList(); };
+
+        paginationDiv.appendChild(prevBtn);
+        paginationDiv.appendChild(pageInfo);
+        paginationDiv.appendChild(nextBtn);
+        container.appendChild(paginationDiv);
+      }
+    }
+
     function renderInstalledLuaSection() {
       const sectionEl = document.createElement("div");
       sectionEl.id = "luatools-installed-lua-section";
       const sectionLuaColors = getThemeColors();
       sectionEl.style.cssText = `margin-top:28px;padding:20px;background:rgba(${sectionLuaColors.rgbString},0.04);border:1px solid ${sectionLuaColors.border};border-radius:10px;`;
 
+      const sectionTitleContainer = document.createElement("div");
+      sectionTitleContainer.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;";
+
       const sectionTitle = document.createElement("div");
       const luaTitleColors = getThemeColors();
-      sectionTitle.style.cssText = `font-size:16px;color:${luaTitleColors.text};margin-bottom:14px;font-weight:600;`;
+      sectionTitle.style.cssText = `font-size:16px;color:${luaTitleColors.text};font-weight:600;`;
       sectionTitle.innerHTML =
         '<i class="fa-solid fa-code" style="margin-right:8px;color:#ffc107;"></i>' +
         t("settings.installedLua.title", "Installed Lua Scripts");
-      sectionEl.appendChild(sectionTitle);
+      sectionTitleContainer.appendChild(sectionTitle);
+
+      const perPageSelect = document.createElement("select");
+      perPageSelect.style.cssText = `background:rgba(${luaTitleColors.rgbString},0.08);color:${luaTitleColors.text};border:1px solid ${luaTitleColors.border};border-radius:6px;padding:4px 8px;font-size:12px;outline:none;cursor:pointer;width:fit-content;`;
+      [5, 10, 25, 50, 100].forEach(function(val) {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val + " " + t("settings.perPage", "per page");
+        if (val === state.luasPerPage) opt.selected = true;
+        opt.style.background = luaTitleColors.bgTertiary || "#1a1a1a";
+        opt.style.color = luaTitleColors.text;
+        perPageSelect.appendChild(opt);
+      });
+      perPageSelect.onchange = function(e) {
+        state.luasPerPage = parseInt(e.target.value, 10);
+        state.luasPage = 1;
+        renderLuaList();
+      };
+      sectionTitleContainer.appendChild(perPageSelect);
+
+      sectionEl.appendChild(sectionTitleContainer);
 
       const listContainer = document.createElement("div");
       listContainer.id = "luatools-lua-list";
@@ -4854,10 +5250,7 @@
       const loadingLuaColors = getThemeColors();
       container.innerHTML =
         `<div style="padding:16px;text-align:center;color:${loadingLuaColors.textSecondary};font-size:13px;">` +
-        t(
-          "settings.installedLua.loading",
-          "Scanning for installed Lua scripts...",
-        ) +
+        t("settings.installedLua.loading", "Scanning for installed Lua scripts...") +
         "</div>";
 
       Millennium.callServerMethod("luatools", "GetInstalledLuaScripts", {
@@ -4866,55 +5259,15 @@
         .then(function (res) {
           const response = typeof res === "string" ? JSON.parse(res) : res;
           if (!response || !response.success) {
-            const errLuaColors = getThemeColors();
             container.innerHTML = `<div style="padding:14px;background:rgba(255,92,92,0.08);border:1px solid rgba(255,92,92,0.3);border-radius:8px;color:#ff5c5c;text-align:center;font-size:13px;">${t("settings.installedLua.error", "Failed to load installed Lua scripts.")}</div>`;
             return;
           }
 
-          const scripts = Array.isArray(response.scripts)
-            ? response.scripts
-            : [];
-          if (scripts.length === 0) {
-            const emptyLuaColors = getThemeColors();
-            container.innerHTML = `<div style="padding:16px;background:rgba(255,255,255,0.03);border:1px solid ${emptyLuaColors.border};border-radius:8px;color:${emptyLuaColors.textSecondary};text-align:center;font-size:13px;">${t("settings.installedLua.empty", "No Lua scripts installed yet.")}</div>`;
-            return;
-          }
-
-          container.innerHTML = "";
-
-          // Check if there are any unknown games
-          const hasUnknownGames = scripts.some(function (s) {
-            return s.gameName && s.gameName.startsWith("Unknown Game");
-          });
-
-          // Show info banner if there are unknown games
-          if (hasUnknownGames) {
-            const infoBanner = document.createElement("div");
-            infoBanner.style.cssText =
-              "margin-bottom:16px;padding:12px 14px;background:rgba(255,193,7,0.1);border:1px solid rgba(255,193,7,0.3);border-radius:6px;color:#ffc107;font-size:13px;display:flex;align-items:center;gap:10px;";
-            infoBanner.innerHTML =
-              '<i class="fa-solid fa-circle-info" style="font-size:16px;"></i><span>' +
-              t(
-                "settings.installedLua.unknownInfo",
-                "Games showing 'Unknown Game' were installed manually (not via LuaTools).",
-              ) +
-              "</span>";
-            container.appendChild(infoBanner);
-          }
-
-          for (let i = 0; i < scripts.length; i++) {
-            const script = scripts[i];
-            const scriptEl = createLuaListItem(script, container);
-            container.appendChild(scriptEl);
-          }
-
-          // Re-apply search filter after loading
-          if (state.searchQuery) {
-            setTimeout(applySearchFilter, 50);
-          }
+          state.luas = Array.isArray(response.scripts) ? response.scripts : [];
+          state.luasPage = 1;
+          renderLuaList();
         })
         .catch(function (err) {
-          const catchLuaColors = getThemeColors();
           container.innerHTML = `<div style="padding:14px;background:rgba(255,92,92,0.08);border:1px solid rgba(255,92,92,0.3);border-radius:8px;color:#ff5c5c;text-align:center;font-size:13px;">${t("settings.installedLua.error", "Failed to load installed Lua scripts.")}</div>`;
         });
     }
@@ -6639,20 +6992,15 @@
                       }
                     } catch (e) {}
 
-                    if (available.length === 1 || isFastDownload) {
-                      // Only one source or fast download enabled, proceed automatically with the first available
+                    if (isFastDownload) {
+                      // Fast download enabled, proceed automatically with the first available
                       const source = available[0];
                       backendLog(
-                        "LuaTools: Auto-selecting " +
-                          (available.length === 1
-                            ? "only source"
-                            : "source via fast download") +
-                          ": " +
-                          source.name,
+                        "LuaTools: Auto-selecting source via fast download: " + source.name,
                       );
                       startDirectDownload(appid, available, 0);
                     } else {
-                      // Multiple sources, let user select
+                      // Fast download disabled, let user select
                       showSourceSelectionModal(appid, available);
                     }
                   } catch (err) {
@@ -7500,22 +7848,17 @@
   // Pre-fetch settings quietly to ensure background values (like fastDownload) are populated immediately,
   // and apply themes immediately once settings load.
   function bootSettings() {
-    if (
-      typeof Millennium === "undefined" ||
-      typeof Millennium.callServerMethod !== "function"
-    ) {
-      setTimeout(bootSettings, 200);
-      return;
+    if (typeof Millennium === "undefined" || typeof Millennium.callServerMethod !== "function") {
+        setTimeout(bootSettings, 200);
+        return;
     }
-    Promise.all([loadThemes(), fetchSettingsConfig()])
-      .then(function () {
+    loadThemes().then(function() {
+        return fetchSettingsConfig();
+    }).then(function() {
         if (typeof ensureLuaToolsStyles === "function") ensureLuaToolsStyles();
-      })
-      .catch(function (e) {
-        try {
-          backendLog("LuaTools: Boot fetchSettingsConfig failed: " + String(e));
-        } catch (_) {}
-      });
+    }).catch(function(e) {
+        try { backendLog("LuaTools: Boot sequence failed: " + String(e)); } catch(_) {}
+    });
   }
   bootSettings();
 

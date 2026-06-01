@@ -262,21 +262,6 @@ function downloads.check_apis_for_app(appid)
     local results = {}
     local morrenus_api_key = settings_manager.get_morrenus_api_key()
 
-    local fast_check_succeeded = false
-    local fast_check_data = {}
-    local fast_resp = http_client.get("http://167.235.229.108/check_apis?appid=" .. tostring(appid), {
-        headers = { ["User-Agent"] = "secretgoonpoon" },
-        timeout = 5
-    })
-    
-    if fast_resp and fast_resp.status == 200 and fast_resp.body then
-        local ok, data = pcall(utils.decode_json, fast_resp.body)
-        if ok and type(data) == "table" then
-            fast_check_data = data
-            fast_check_succeeded = true
-        end
-    end
-
     for _, api in ipairs(apis) do
         local name = api.name or "Unknown"
         local template = api.url or ""
@@ -298,34 +283,27 @@ function downloads.check_apis_for_app(appid)
         local url = template:gsub("<appid>", tostring(appid))
         local available = false
 
-        if fast_check_succeeded then
-            local check_key = (string.lower(name) == "morrenus") and "Sadie (Morrenus)" or name
-            if fast_check_data[check_key] == "available" then
+        if string.lower(name) == "morrenus" then
+            local status_url = "https://hubcapmanifest.com/api/v1/status/" .. tostring(appid) .. "?api_key=" .. tostring(morrenus_api_key)
+            local resp = http_client.get(status_url, { headers = { ["User-Agent"] = config.USER_AGENT }, timeout = 5 })
+            if resp and resp.status == success_code then
                 available = true
             end
         else
-            if string.lower(name) == "morrenus" then
-                local status_url = "https://hubcapmanifest.com/api/v1/status/" .. tostring(appid) .. "?api_key=" .. tostring(morrenus_api_key)
-                local resp = http_client.get(status_url, { headers = { ["User-Agent"] = config.USER_AGENT }, timeout = 5 })
-                if resp and resp.status == success_code then
-                    available = true
-                end
+            local success = false
+            local resp = http_client.head(url, { headers = { ["User-Agent"] = config.USER_AGENT }, timeout = 5 })
+            if resp and resp.status == success_code then
+                success = true
             else
-                local success = false
-                local resp = http_client.head(url, { headers = { ["User-Agent"] = config.USER_AGENT }, timeout = 5 })
-                if resp and resp.status == success_code then
+                -- Fallback to GET if HEAD fails
+                local get_resp = http_client.get(url, { headers = { ["User-Agent"] = config.USER_AGENT }, timeout = 5 })
+                if get_resp and get_resp.status == success_code then
                     success = true
-                else
-                    -- Fallback to GET if HEAD fails
-                    local get_resp = http_client.get(url, { headers = { ["User-Agent"] = config.USER_AGENT }, timeout = 5 })
-                    if get_resp and get_resp.status == success_code then
-                        success = true
-                    end
                 end
-                
-                if success then
-                    available = true
-                end
+            end
+            
+            if success then
+                available = true
             end
         end
 

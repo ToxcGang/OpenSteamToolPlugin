@@ -31,8 +31,38 @@ function utils.decode_json(text)
 end
 
 function utils.encode_json(data)
+    -- If it's the api_manifest table structure, use a custom strict formatter
+    if type(data) == "table" and data.api_list and type(data.api_list) == "table" then
+        local lines = {}
+        table.insert(lines, '{"api_list": [')
+        
+        for i, api in ipairs(data.api_list) do
+            table.insert(lines, '        {')
+            -- Ensure "name" is always first
+            table.insert(lines, '            "name": ' .. cjson.encode(api.name or "") .. ',')
+            table.insert(lines, '            "url": ' .. cjson.encode(api.url or ""):gsub("\\/", "/") .. ',')
+            table.insert(lines, '            "success_code": ' .. tostring(api.success_code or 200) .. ',')
+            table.insert(lines, '            "unavailable_code": ' .. tostring(api.unavailable_code or 404) .. ',')
+            table.insert(lines, '            "enabled": ' .. tostring(api.enabled ~= false))
+            
+            if i == #data.api_list then
+                table.insert(lines, '        }')
+            else
+                table.insert(lines, '        },')
+            end
+        end
+        
+        table.insert(lines, '    ]}')
+        return table.concat(lines, "\n")
+    end
+
+    -- Fallback for all other normal JSON serializations
     local success, content = pcall(cjson.encode, data)
-    if success then return content else return "{}" end
+    if success then
+        return content
+    else 
+        return "{}" 
+    end
 end
 
 function utils.write_json(path, data)

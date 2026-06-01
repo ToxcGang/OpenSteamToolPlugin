@@ -200,4 +200,161 @@ function api_manifest.get_api_list()
     return { success = true, apis = api_names }
 end
 
+function api_manifest.get_all_apis()
+    local path = paths.backend_path(config.API_JSON_FILE)
+    local data = utils.read_json(path)
+    local apis = {}
+    if data and type(data.api_list) == "table" then
+        for _, api in ipairs(data.api_list) do
+            table.insert(apis, {
+                name    = api.name or "Unknown",
+                url     = api.url or "",
+                enabled = api.enabled ~= false  -- default true
+            })
+        end
+    end
+    return { success = true, apis = apis }
+end
+
+function api_manifest.toggle_api(name)
+    if not name or type(name) ~= "string" or name == "" then
+        return { success = false, error = "name is required" }
+    end
+
+    local path = paths.backend_path(config.API_JSON_FILE)
+    local data = utils.read_json(path)
+    if not data or type(data.api_list) ~= "table" then
+        return { success = false, error = "Failed to load api.json" }
+    end
+
+    local found = false
+    local new_state = false
+    for _, api in ipairs(data.api_list) do
+        if api.name == name then
+            api.enabled = not (api.enabled ~= false)
+            new_state = api.enabled
+            found = true
+            break
+        end
+    end
+
+    if not found then
+        return { success = false, error = "API not found: " .. name }
+    end
+
+    local new_text = utils.encode_json(data)
+    local formatted = utils.normalize_manifest_text(new_text)
+    utils.write_text(path, formatted)
+
+    logger.log("LuaTools: Toggled API '" .. name .. "' -> " .. tostring(new_state))
+    return { success = true, enabled = new_state }
+end
+
+function api_manifest.remove_api(name)
+    if not name or type(name) ~= "string" or name == "" then
+        return { success = false, error = "name is required" }
+    end
+
+    local path = paths.backend_path(config.API_JSON_FILE)
+    local data = utils.read_json(path)
+    if not data or type(data.api_list) ~= "table" then
+        return { success = false, error = "Failed to load api.json" }
+    end
+
+    local new_list = {}
+    local found = false
+    for _, api in ipairs(data.api_list) do
+        if api.name == name then
+            found = true
+        else
+            table.insert(new_list, api)
+        end
+    end
+
+    if not found then
+        return { success = false, error = "API not found: " .. name }
+    end
+
+    data.api_list = new_list
+    local new_text = utils.encode_json(data)
+    local formatted = utils.normalize_manifest_text(new_text)
+    utils.write_text(path, formatted)
+
+    logger.log("LuaTools: Removed API '" .. name .. "'")
+    return { success = true }
+end
+
+function api_manifest.rename_api(old_name, new_name)
+    if not old_name or old_name == "" or not new_name or new_name == "" then
+        return { success = false, error = "old_name and new_name are required" }
+    end
+
+    local path = paths.backend_path(config.API_JSON_FILE)
+    local data = utils.read_json(path)
+    if not data or type(data.api_list) ~= "table" then
+        return { success = false, error = "Failed to load api.json" }
+    end
+
+    local found = false
+    for _, api in ipairs(data.api_list) do
+        if api.name == old_name then
+            api.name = new_name
+            found = true
+            break
+        end
+    end
+
+    if not found then
+        return { success = false, error = "API not found: " .. old_name }
+    end
+
+    local new_text = utils.encode_json(data)
+    local formatted = utils.normalize_manifest_text(new_text)
+    utils.write_text(path, formatted)
+
+    logger.log("LuaTools: Renamed API '" .. old_name .. "' -> '" .. new_name .. "'")
+    return { success = true }
+end
+
+function api_manifest.set_api_order(ordered_names)
+    if type(ordered_names) ~= "table" then
+        return { success = false, error = "ordered_names must be a table" }
+    end
+
+    local path = paths.backend_path(config.API_JSON_FILE)
+    local data = utils.read_json(path)
+    if not data or type(data.api_list) ~= "table" then
+        return { success = false, error = "Failed to load api.json" }
+    end
+
+    local new_list = {}
+    local added = {}
+
+    -- Add items in the requested order
+    for _, name in ipairs(ordered_names) do
+        for _, api in ipairs(data.api_list) do
+            if api.name == name and not added[name] then
+                table.insert(new_list, api)
+                added[name] = true
+                break
+            end
+        end
+    end
+
+    -- Add any items that were left out of the ordered list (safeguard)
+    for _, api in ipairs(data.api_list) do
+        if not added[api.name] then
+            table.insert(new_list, api)
+        end
+    end
+
+    data.api_list = new_list
+    local new_text = utils.encode_json(data)
+    local formatted = utils.normalize_manifest_text(new_text)
+    utils.write_text(path, formatted)
+
+    logger.log("LuaTools: Reordered APIs")
+    return { success = true }
+end
+
 return api_manifest
