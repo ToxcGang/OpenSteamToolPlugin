@@ -4,13 +4,13 @@ options.SETTINGS_GROUPS = {
     {
         key = "general",
         label = "General",
-        description = "Global LuaTools preferences.",
+        description = "Global OpenLuaTools preferences.",
         options = {
             {
                 key = "useSteamLanguage",
                 label = "Use Steam Language",
                 option_type = "toggle",
-                description = "Use the Steam client's language for LuaTools.",
+                description = "Use the Steam client's language for OpenLuaTools.",
                 default = true,
                 metadata = {yesLabel = "Yes", noLabel = "No"}
             },
@@ -18,7 +18,7 @@ options.SETTINGS_GROUPS = {
                 key = "language",
                 label = "Language",
                 option_type = "select",
-                description = "Choose the language used by LuaTools.",
+                description = "Choose the language used by OpenLuaTools.",
                 default = "en",
                 metadata = {dynamicChoices = "locales"}
             },
@@ -26,7 +26,7 @@ options.SETTINGS_GROUPS = {
                 key = "donateKeys",
                 label = "Donate Keys",
                 option_type = "toggle",
-                description = "Allow LuaTools to donate spare Steam keys. (placeholder option)",
+                description = "Allow OpenLuaTools to donate spare Steam keys. (placeholder option)",
                 default = true,
                 metadata = {yesLabel = "Yes", noLabel = "No"}
             },
@@ -34,7 +34,7 @@ options.SETTINGS_GROUPS = {
                 key = "theme",
                 label = "Theme",
                 option_type = "select",
-                description = "Choose the color theme for LuaTools interface.",
+                description = "Choose the color theme for OpenLuaTools interface.",
                 default = "original",
                 metadata = {dynamicChoices = "themes"}
             },

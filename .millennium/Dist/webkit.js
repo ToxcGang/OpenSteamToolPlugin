@@ -1,5 +1,5 @@
 const MILLENNIUM_IS_CLIENT_MODULE = false;
-const pluginName = "luatools";
+const pluginName = "openluatools";
 function InitializePlugins() {
     var _a, _b;
     (_a = (window.PLUGIN_LIST || (window.PLUGIN_LIST = {})))[pluginName] || (_a[pluginName] = {});

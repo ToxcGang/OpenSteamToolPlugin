@@ -33,7 +33,7 @@ function auto_update.check_for_updates_now()
         local resp = http_client.get(endpoint, {
             headers = {
                 ["Accept"] = "application/vnd.github+json",
-                ["User-Agent"] = "LuaTools-Updater"
+                ["User-Agent"] = "OpenLuaTools-Updater"
             },
             timeout = 10
         })
@@ -89,7 +89,7 @@ function auto_update.check_for_updates_now()
     local is_windows = m_utils.getenv("OS") == "Windows_NT"
     local cmd
     if is_windows then
-        cmd = string.format('curl.exe -sL -A "LuaTools-OpenSteamTool" "%s" -o "%s" && tar.exe -xf "%s" -C "%s"', zip_url, pending_zip, pending_zip, paths.get_plugin_dir())
+        cmd = string.format('curl.exe -sL -A "OpenLuaTools-OpenSteamTool" "%s" -o "%s" && tar.exe -xf "%s" -C "%s"', zip_url, pending_zip, pending_zip, paths.get_plugin_dir())
     else
         cmd = string.format('curl -L -o "%s" "%s" && unzip -o -q "%s" -d "%s"', pending_zip, zip_url, pending_zip, paths.get_plugin_dir())
     end
@@ -98,7 +98,7 @@ function auto_update.check_for_updates_now()
 
     if fs.exists(pending_zip) then fs.remove(pending_zip) end
 
-    local msg = "LuaTools updated to " .. latest_version .. ". Please restart Steam."
+    local msg = "OpenLuaTools updated to " .. latest_version .. ". Please restart Steam."
     return { success = true, message = msg }
 end
 

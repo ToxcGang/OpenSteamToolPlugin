@@ -1,4 +1,4 @@
--- LuaTools backend main.lua
+-- OpenLuaTools backend main.lua
 -- All exported functions return JSON-encoded strings, mirroring the Python backend's json.dumps() returns.
 -- This is required because Millennium's Lua bridge does not deep-serialize nested Lua tables.
 
@@ -106,26 +106,26 @@ local function copy_webkit_files()
         fs.create_directories(target_webkit_dir)
     end
 
-    copy_public_file("luatools.js", fs.join(target_webkit_dir, "luatools.js"), target_webkit_dir)
+    copy_public_file("openluatools.js", fs.join(target_webkit_dir, "openluatools.js"), target_webkit_dir)
     copy_public_file("steamdb-webkit.css", fs.join(target_webkit_dir, "steamdb-webkit.css"), target_webkit_dir)
     copy_public_directory("themes", fs.join(target_webkit_dir, "themes"), target_webkit_dir)
 
-    local luatools_dir = fs.join(target_webkit_dir, "LuaTools")
-    if not fs.exists(luatools_dir) then
-        fs.create_directories(luatools_dir)
+    local openluatools_dir = fs.join(target_webkit_dir, "OpenLuaTools")
+    if not fs.exists(openluatools_dir) then
+        fs.create_directories(openluatools_dir)
     end
-    copy_public_file("luatools-icon.png", fs.join(luatools_dir, "luatools-icon.png"), target_webkit_dir)
+    copy_public_file("openluatools-icon.png", fs.join(openluatools_dir, "openluatools-icon.png"), target_webkit_dir)
 end
 
 local function inject_webkit_files()
     millennium.add_browser_css("webkit/steamdb-webkit.css")
-    millennium.add_browser_js("webkit/luatools.js")
+    millennium.add_browser_js("webkit/openluatools.js")
 end
 
 -- ── Lifecycle ────────────────────────────────────────────────────────────────
 
 local function on_load()
-    logger.log("Bootstrapping LuaTools plugin, millennium " .. millennium.version())
+    logger.log("Bootstrapping OpenLuaTools plugin, millennium " .. millennium.version())
     steam_utils.detect_steam_install_path()
     utils.ensure_temp_download_dir()
 
@@ -151,7 +151,7 @@ local function on_load()
 end
 
 local function on_unload()
-    logger.log("unloading LuaTools plugin")
+    logger.log("unloading OpenLuaTools plugin")
 end
 
 local function on_frontend_loaded()
@@ -228,21 +228,21 @@ function RestartSteam()
     return json_ok({ success = false, error = "Failed to restart Steam" })
 end
 
-function HasLuaToolsForApp(appid)
+function HasOpenLuaToolsForApp(appid)
     if type(appid) == "table" then appid = appid.appid end
     local ok, exists = pcall(steam_utils.has_lua_for_app, tonumber(appid))
     if not ok then return json_err(exists) end
     return json_ok({ success = true, exists = exists == true })
 end
 
-function StartAddViaLuaTools(appid)
+function StartAddViaOpenLuaTools(appid)
     if type(appid) == "table" then appid = appid.appid end
-    local ok, res = pcall(downloads.start_add_via_luatools, tonumber(appid))
+    local ok, res = pcall(downloads.start_add_via_openluatools, tonumber(appid))
     if not ok then return json_err(res) end
     return json_ok(res)
 end
 
-function GetAddViaLuaToolsStatus(appid)
+function GetAddViaOpenLuaToolsStatus(appid)
     if type(appid) == "table" then appid = appid.appid end
     local ok, res = pcall(downloads.get_add_status, tonumber(appid))
     if not ok then return json_err(res) end
@@ -324,7 +324,7 @@ function ReorderApis(params, contentScriptQuery)
     return json_ok(res)
 end
 
-function CancelAddViaLuaTools(appid)
+function CancelAddViaOpenLuaTools(appid)
     -- No-op cancel stub; download is synchronous in Lua
     return json_ok({ success = true })
 end
@@ -351,17 +351,17 @@ function GetMorrenusStats(api_key, force_refresh)
     return json_err("request failed")
 end
 
-function StartAddViaLuaToolsFromUrl(apiName, appid, contentScriptQuery, url)
+function StartAddViaOpenLuaToolsFromUrl(apiName, appid, contentScriptQuery, url)
     -- Millennium's IPC bridge sorts JS object keys alphabetically and passes their values as positional arguments.
     -- The JS passes: { apiName: ..., appid: ..., contentScriptQuery: "", url: ... }
     -- So the Lua signature MUST be (apiName, appid, contentScriptQuery, url)
 
-    logger.log("StartAddViaLuaToolsFromUrl CALLED: appid=" ..
+    logger.log("StartAddViaOpenLuaToolsFromUrl CALLED: appid=" ..
     tostring(appid) .. ", url=" .. tostring(url) .. ", apiName=" .. tostring(apiName))
 
-    local ok, res = pcall(downloads.start_add_via_luatools_from_url, appid, url, apiName)
+    local ok, res = pcall(downloads.start_add_via_openluatools_from_url, appid, url, apiName)
     if not ok then
-        logger.warn("StartAddViaLuaToolsFromUrl CRASHED inside pcall: " .. tostring(res))
+        logger.warn("StartAddViaOpenLuaToolsFromUrl CRASHED inside pcall: " .. tostring(res))
         return json_err(res)
     end
 
@@ -370,7 +370,7 @@ end
 
 function GetIconDataUrl()
     -- Python read an icon file from the public dir and base64-encoded it
-    local icon_path = paths.find_public_path("luatools-icon.png")
+    local icon_path = paths.find_public_path("openluatools-icon.png")
     if icon_path and fs.exists(icon_path) then
         local content = m_utils.read_file(icon_path)
         if content then
@@ -422,7 +422,7 @@ function DismissLoadedApps()
     return json_ok({ success = true })
 end
 
-function DeleteLuaToolsForApp(appid)
+function DeleteOpenLuaToolsForApp(appid)
     if type(appid) == "table" then appid = appid.appid end
     local target_dir = steam_utils.get_opensteamtool_lua_dir()
     if not target_dir then return json_err("Could not find OpenSteamTool Lua directory") end

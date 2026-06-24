@@ -106,13 +106,13 @@ function downloads._finalize_install_lua(appid, extract_dir, dest_path, api_name
                 end
                 copied_manifests = copied_manifests + 1
             elseif name:match("%.manifest$") then
-                logger.warn("LuaTools: Skipping invalid manifest filename: " .. tostring(name))
+                logger.warn("OpenLuaTools: Skipping invalid manifest filename: " .. tostring(name))
             end
 
             if safety.is_expected_lua_filename(name, appid) then
                 extracted_lua_path = entry.path
             elseif name:match("%.lua$") then
-                logger.warn("LuaTools: Skipping unexpected Lua filename: " .. tostring(name))
+                logger.warn("OpenLuaTools: Skipping unexpected Lua filename: " .. tostring(name))
             end
         end
     end
@@ -146,7 +146,7 @@ local function _launch_async_download(appid, url, dest_path, extract_dir)
 
     if is_windows then
         local cmd = string.format(
-            'cmd.exe /C start "LuaTools Downloader" cmd.exe /C "color 0B && echo LuaTools is downloading the requested files... && echo Please keep this window open until it closes automatically. && echo. && (echo {"status": "downloading"} > "%s" && curl.exe -# -L -A "discord(dot)gg/luatools" "%s" -o "%s" && echo {"status": "extracting"} > "%s" && echo. && echo Extracting files... && tar.exe -xf "%s" -C "%s" && echo {"status": "extracted"} > "%s") || (echo. && echo ERROR: Download or extraction failed! && echo {"status": "failed"} > "%s" && timeout /t 5)"',
+            'cmd.exe /C start "OpenLuaTools Downloader" cmd.exe /C "color 0B && echo OpenLuaTools is downloading the requested files... && echo Please keep this window open until it closes automatically. && echo. && (echo {"status": "downloading"} > "%s" && curl.exe -# -L -A "discord(dot)gg/luatools" "%s" -o "%s" && echo {"status": "extracting"} > "%s" && echo. && echo Extracting files... && tar.exe -xf "%s" -C "%s" && echo {"status": "extracted"} > "%s") || (echo. && echo ERROR: Download or extraction failed! && echo {"status": "failed"} > "%s" && timeout /t 5)"',
             state_file, url, dest_path, state_file, dest_path, extract_dir, state_file, state_file
         )
         m_utils.exec(cmd)
@@ -161,11 +161,11 @@ local function _launch_async_download(appid, url, dest_path, extract_dir)
     end
 end
 
-function downloads.start_add_via_luatools_from_url(appid, url, apiName)
+function downloads.start_add_via_openluatools_from_url(appid, url, apiName)
     if type(appid) == "string" then appid = tonumber(appid) end
     if not appid then return { success = false, error = "Invalid appid" } end
 
-    logger.log("LuaTools: StartAddViaLuaToolsFromUrl appid=" .. tostring(appid) .. " api=" .. tostring(apiName))
+    logger.log("OpenLuaTools: StartAddViaOpenLuaToolsFromUrl appid=" .. tostring(appid) .. " api=" .. tostring(apiName))
     _set_download_state(appid, { status = "downloading", currentApi = apiName, bytesRead = 0, totalBytes = 0 })
 
     local ok, res = pcall(function()
@@ -176,7 +176,7 @@ function downloads.start_add_via_luatools_from_url(appid, url, apiName)
     end)
 
     if not ok then
-        logger.warn("LuaTools: Async Download crashed - " .. tostring(res))
+        logger.warn("OpenLuaTools: Async Download crashed - " .. tostring(res))
         _set_download_state(appid, { status = "failed", error = tostring(res) })
         return { success = false, error = tostring(res) }
     end
@@ -184,11 +184,11 @@ function downloads.start_add_via_luatools_from_url(appid, url, apiName)
     return { success = true }
 end
 
-function downloads.start_add_via_luatools(appid)
+function downloads.start_add_via_openluatools(appid)
     if type(appid) == "string" then appid = tonumber(appid) end
     if not appid then return { success = false, error = "Invalid appid" } end
 
-    logger.log("LuaTools: StartAddViaLuaTools appid=" .. tostring(appid))
+    logger.log("OpenLuaTools: StartAddViaOpenLuaTools appid=" .. tostring(appid))
     _set_download_state(appid, { status = "queued", bytesRead = 0, totalBytes = 0 })
 
     local apis = api_manifest.load_api_manifest()
@@ -259,7 +259,7 @@ function downloads.start_add_via_luatools(appid)
                         break
                     end
                 else
-                    logger.warn("LuaTools: Skipping unsafe API URL for " .. tostring(name))
+                    logger.warn("OpenLuaTools: Skipping unsafe API URL for " .. tostring(name))
                 end
             end
         end
@@ -270,7 +270,7 @@ function downloads.start_add_via_luatools(appid)
     end)
 
     if not ok then
-        logger.warn("LuaTools: start_add_via_luatools crashed - " .. tostring(res))
+        logger.warn("OpenLuaTools: start_add_via_openluatools crashed - " .. tostring(res))
         _set_download_state(appid, { status = "failed", error = tostring(res) })
         return { success = false, error = tostring(res) }
     end
@@ -341,7 +341,7 @@ function downloads.check_apis_for_app(appid)
                     end
                 end
             else
-                logger.warn("LuaTools: Skipping unsafe API URL for " .. tostring(name))
+                logger.warn("OpenLuaTools: Skipping unsafe API URL for " .. tostring(name))
             end
 
             table.insert(results, {

@@ -1,7 +1,7 @@
 local config = {
-    WEBKIT_DIR_NAME = "LuaTools",
-    WEB_UI_JS_FILE = "luatools.js",
-    WEB_UI_ICON_FILE = "luatools-icon.png",
+    WEBKIT_DIR_NAME = "OpenLuaTools",
+    WEB_UI_JS_FILE = "openluatools.js",
+    WEB_UI_ICON_FILE = "openluatools-icon.png",
 
     DEFAULT_HEADERS = {
         ["Accept"] = "application/json",

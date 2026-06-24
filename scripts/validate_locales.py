@@ -45,7 +45,7 @@ def write_locale(path: Path, meta: dict, strings: dict) -> None:
 def extract_keys_from_js(js_path: Path) -> dict[str, str]:
     """Extract translation keys from JS source.
 
-    Recognises two call patterns used in luatools.js:
+    Recognises two call patterns used in openluatools.js:
       lt("text")           -> key = "text",  english value = "text"
       t("key", "fallback") -> key = "key",   english value = "fallback"
 
@@ -125,7 +125,7 @@ def ensure_locales(base_dir: Path, js_keys: dict[str, str]) -> int:
 def main() -> None:
     repo_root = Path(__file__).resolve().parent.parent
     locales_dir = repo_root / "backend" / "locales"
-    js_path = repo_root / "public" / "luatools.js"
+    js_path = repo_root / "public" / "openluatools.js"
 
     if not locales_dir.exists():
         raise RuntimeError(f"Locales directory not found: {locales_dir}")

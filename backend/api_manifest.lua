@@ -104,12 +104,12 @@ local function ensure_api_manifest_data()
     local data = read_api_manifest(path)
     if data then return data end
 
-    logger.warn("LuaTools: api.json missing or invalid; attempting to initialize")
+    logger.warn("OpenLuaTools: api.json missing or invalid; attempting to initialize")
     pcall(api_manifest.init_apis)
     data = read_api_manifest(path)
     if data then return data end
 
-    logger.warn("LuaTools: seeding bundled default API manifest")
+    logger.warn("OpenLuaTools: seeding bundled default API manifest")
     seed_default_api_manifest(path)
     return read_api_manifest(path) or { api_list = {} }
 end
@@ -168,22 +168,22 @@ function api_manifest.store_last_message(message)
 end
 
 function api_manifest.fetch_free_apis_now()
-    logger.log("LuaTools: FetchFreeApisNow invoked")
+    logger.log("OpenLuaTools: FetchFreeApisNow invoked")
     local manifest_text = ""
 
-    logger.log("LuaTools: Fetching manifest from " .. config.API_MANIFEST_URL)
+    logger.log("OpenLuaTools: Fetching manifest from " .. config.API_MANIFEST_URL)
     local resp = http_client.get(config.API_MANIFEST_URL, { timeout = 15 })
     if resp and resp.status == 200 and resp.body then
         manifest_text = resp.body
-        logger.log("LuaTools: Fetched manifest from primary URL")
+        logger.log("OpenLuaTools: Fetched manifest from primary URL")
     else
-        logger.warn("LuaTools: Primary manifest URL failed, trying proxy...")
+        logger.warn("OpenLuaTools: Primary manifest URL failed, trying proxy...")
         resp = http_client.get(config.API_MANIFEST_PROXY_URL, { timeout = config.HTTP_PROXY_TIMEOUT_SECONDS })
         if resp and resp.status == 200 and resp.body then
             manifest_text = resp.body
-            logger.log("LuaTools: Fetched manifest from proxy URL")
+            logger.log("OpenLuaTools: Fetched manifest from proxy URL")
         else
-            logger.warn("LuaTools: Proxy manifest URL also failed")
+            logger.warn("OpenLuaTools: Proxy manifest URL also failed")
             return { success = false, error = "Both URLs failed" }
         end
     end
@@ -209,7 +209,7 @@ function api_manifest.load_api_manifest()
     local normalized = utils.normalize_manifest_text(text)
     if normalized and normalized ~= text and normalized ~= "" then
         utils.write_text(path, normalized)
-        logger.log("LuaTools: Normalized api.json")
+        logger.log("OpenLuaTools: Normalized api.json")
         text = normalized
     end
 
@@ -262,7 +262,7 @@ function api_manifest.add_custom_api(payload)
     local formatted = utils.normalize_manifest_text(new_text)
     utils.write_text(path, formatted)
     
-    logger.log("LuaTools: Added custom API: " .. payload.name)
+    logger.log("OpenLuaTools: Added custom API: " .. payload.name)
     return { success = true }
 end
 
@@ -334,7 +334,7 @@ function api_manifest.toggle_api(name)
     local formatted = utils.normalize_manifest_text(new_text)
     utils.write_text(path, formatted)
 
-    logger.log("LuaTools: Toggled API '" .. name .. "' -> " .. tostring(new_state))
+    logger.log("OpenLuaTools: Toggled API '" .. name .. "' -> " .. tostring(new_state))
     return { success = true, enabled = new_state }
 end
 
@@ -368,7 +368,7 @@ function api_manifest.remove_api(name)
     local formatted = utils.normalize_manifest_text(new_text)
     utils.write_text(path, formatted)
 
-    logger.log("LuaTools: Removed API '" .. name .. "'")
+    logger.log("OpenLuaTools: Removed API '" .. name .. "'")
     return { success = true }
 end
 
@@ -400,7 +400,7 @@ function api_manifest.rename_api(old_name, new_name)
     local formatted = utils.normalize_manifest_text(new_text)
     utils.write_text(path, formatted)
 
-    logger.log("LuaTools: Renamed API '" .. old_name .. "' -> '" .. new_name .. "'")
+    logger.log("OpenLuaTools: Renamed API '" .. old_name .. "' -> '" .. new_name .. "'")
     return { success = true }
 end
 
@@ -441,7 +441,7 @@ function api_manifest.set_api_order(ordered_names)
     local formatted = utils.normalize_manifest_text(new_text)
     utils.write_text(path, formatted)
 
-    logger.log("LuaTools: Reordered APIs")
+    logger.log("OpenLuaTools: Reordered APIs")
     return { success = true }
 end
 

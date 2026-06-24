@@ -74,7 +74,7 @@ function LocaleManager:refresh()
     _ensure_locales_dir()
     local meta, strings = _read_locale_file(DEFAULT_LOCALE)
     if not strings or next(strings) == nil then
-        logger.warn("LuaTools: Default locale en.json is empty or missing.")
+        logger.warn("OpenLuaTools: Default locale en.json is empty or missing.")
         strings = {}
     end
     

@@ -18,7 +18,7 @@ def _ensure_locales_dir() -> None:
     try:
         os.makedirs(LOCALES_DIR, exist_ok=True)
     except Exception as exc:
-        logger.warn(f"LuaTools: Failed to ensure locales dir: {exc}")
+        logger.warn(f"OpenLuaTools: Failed to ensure locales dir: {exc}")
 
 
 def _locale_path(locale: str) -> str:
@@ -33,7 +33,7 @@ def _read_locale_file(locale: str) -> Tuple[Dict[str, Any], Dict[str, str]]:
         with open(path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
     except Exception as exc:
-        logger.warn(f"LuaTools: Failed to read locale file {path}: {exc}")
+        logger.warn(f"OpenLuaTools: Failed to read locale file {path}: {exc}")
         return {}, {}
 
     meta = data.get("_meta")
@@ -66,7 +66,7 @@ def _write_locale_file(locale: str, meta: Dict[str, Any], strings: Dict[str, str
         with open(_locale_path(locale), "w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, ensure_ascii=False)
     except Exception as exc:
-        logger.warn(f"LuaTools: Failed to write locale file {locale}: {exc}")
+        logger.warn(f"OpenLuaTools: Failed to write locale file {locale}: {exc}")
 
 
 def _normalise_value(value: Optional[str]) -> Optional[str]:
@@ -99,7 +99,7 @@ class LocaleManager:
             # Load default locale first
             meta, strings = _read_locale_file(DEFAULT_LOCALE)
             if not strings:
-                logger.warn("LuaTools: Default locale en.json is empty or missing.")
+                logger.warn("OpenLuaTools: Default locale en.json is empty or missing.")
                 strings = {}
             self._english_meta = {**meta, "code": DEFAULT_LOCALE}
             self._english_strings = strings.copy()

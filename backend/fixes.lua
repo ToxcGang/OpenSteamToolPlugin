@@ -37,7 +37,7 @@ function fixes.check_for_fixes(appid)
         onlineFix = { status = 0, available = false }
     }
 
-    local FIXES_INDEX_URL = "https://index.luatools.work/fixes-index.json"
+    local FIXES_INDEX_URL = "https://index.openluatools.work/fixes-index.json"
     local resp = http_client.get(FIXES_INDEX_URL, { timeout = 10 })
     if resp and resp.status == 200 and resp.body then
         local data = utils.decode_json(resp.body)
@@ -81,7 +81,7 @@ function fixes.apply_game_fix(appid, download_url, install_path, fix_type, game_
     local p = _fix_paths(appid)
     local install_root = fs.absolute(install_path)
 
-    logger.log("LuaTools: Applying fix to " .. tostring(install_path))
+    logger.log("OpenLuaTools: Applying fix to " .. tostring(install_path))
     m_utils.write_file(p.state_file, '{"status": "downloading"}')
     _write_json(p.meta_file, { installPath = install_root, fixType = fix_type or "", gameName = game_name or "" })
 
@@ -91,7 +91,7 @@ function fixes.apply_game_fix(appid, download_url, install_path, fix_type, game_
     local is_windows = m_utils.getenv("OS") == "Windows_NT"
     if is_windows then
         local cmd = string.format(
-            'cmd.exe /C start "LuaTools Downloader" cmd.exe /C "color 0B && echo LuaTools is downloading the requested files... && echo Please keep this window open until it closes automatically. && echo. && (echo {"status": "downloading"} > "%s" && curl.exe -# -L -A "discord(dot)gg/luatools" "%s" -o "%s" && echo {"status": "extracting"} > "%s" && echo. && echo Extracting files... && tar.exe -xf "%s" -C "%s" && echo {"status": "extracted"} > "%s") || (echo. && echo ERROR: Download or extraction failed! && echo {"status": "failed"} > "%s" && timeout /t 5)"',
+            'cmd.exe /C start "OpenLuaTools Downloader" cmd.exe /C "color 0B && echo OpenLuaTools is downloading the requested files... && echo Please keep this window open until it closes automatically. && echo. && (echo {"status": "downloading"} > "%s" && curl.exe -# -L -A "discord(dot)gg/luatools" "%s" -o "%s" && echo {"status": "extracting"} > "%s" && echo. && echo Extracting files... && tar.exe -xf "%s" -C "%s" && echo {"status": "extracted"} > "%s") || (echo. && echo ERROR: Download or extraction failed! && echo {"status": "failed"} > "%s" && timeout /t 5)"',
             p.state_file, download_url, p.dest_zip, p.state_file, p.dest_zip, p.extract_dir, p.state_file, p.state_file
         )
         m_utils.exec(cmd)

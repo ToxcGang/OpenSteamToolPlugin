@@ -13,7 +13,7 @@ function steam_utils.detect_steam_install_path()
     local success, path = pcall(millennium.steam_path)
     if success and path then
         STEAM_INSTALL_PATH = path
-        logger.log("LuaTools: Steam install path set to " .. tostring(STEAM_INSTALL_PATH))
+        logger.log("OpenLuaTools: Steam install path set to " .. tostring(STEAM_INSTALL_PATH))
         return STEAM_INSTALL_PATH
     end
     return ""
