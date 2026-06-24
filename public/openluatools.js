@@ -643,6 +643,57 @@
     }
   }
 
+  const OPENLUATOOLS_ICON_PATH = "OpenLuaTools/openluatools-icon.png";
+
+  function parseOpenLuaToolsPayload(res) {
+    try {
+      return typeof res === "string" ? JSON.parse(res) : res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function loadOpenLuaToolsIcon(img) {
+    if (!img) return;
+
+    img.alt = img.alt || "OpenLuaTools";
+    img.onerror = function () {
+      this.style.display = "none";
+    };
+
+    function useFallbackIcon() {
+      img.style.display = "";
+      img.src = OPENLUATOOLS_ICON_PATH;
+    }
+
+    useFallbackIcon();
+
+    try {
+      if (
+        typeof Millennium === "undefined" ||
+        typeof Millennium.callServerMethod !== "function"
+      ) {
+        return;
+      }
+
+      Millennium.callServerMethod("openluatools", "GetIconDataUrl", {})
+        .then(function (res) {
+          const payload = parseOpenLuaToolsPayload(res);
+          if (
+            payload &&
+            payload.success &&
+            typeof payload.dataUrl === "string" &&
+            payload.dataUrl.length > "data:image/png;base64,".length &&
+            payload.dataUrl.indexOf("data:image/png;base64,") === 0
+          ) {
+            img.style.display = "";
+            img.src = payload.dataUrl;
+          }
+        })
+        .catch(function () {});
+    } catch (_) {}
+  }
+
   backendLog("OpenLuaTools script loaded");
   backendLog(
     "Mode Detection: " +
@@ -1184,10 +1235,12 @@
                 outline: 2px solid ${theme.accent};
                 outline-offset: 2px;
             }
-            button.openluatools-header-button img,
-            button.openluatools-header-button svg {
-                height: 16px;
-                width: 16px;
+            button.openluatools-header-button img {
+                display: block;
+                height: 18px;
+                width: 18px;
+                object-fit: contain;
+                border-radius: 3px;
             }
         `;
   }
@@ -1487,28 +1540,10 @@
         const title = document.createElement("div");
         title.style.cssText = `display:flex;align-items:center;gap:10px;font-size:22px;color:${colors.text};font-weight:600;`;
         const titleIcon = document.createElement("img");
-        titleIcon.style.cssText = "width:24px;height:24px;border-radius:4px;";
+        titleIcon.style.cssText =
+          "width:24px;height:24px;border-radius:4px;display:block;object-fit:contain;";
         titleIcon.alt = "OpenLuaTools";
-        try {
-          Millennium.callServerMethod("openluatools", "GetIconDataUrl", {
-            contentScriptQuery: "",
-          }).then(function (res) {
-            try {
-              const p = typeof res === "string" ? JSON.parse(res) : res;
-              titleIcon.src =
-                p && p.success && p.dataUrl
-                  ? p.dataUrl
-                  : "OpenLuaTools/openluatools-icon.png";
-            } catch (_) {
-              titleIcon.src = "OpenLuaTools/openluatools-icon.png";
-            }
-          });
-        } catch (_) {
-          titleIcon.src = "OpenLuaTools/openluatools-icon.png";
-        }
-        titleIcon.onerror = function () {
-          this.style.display = "none";
-        };
+        loadOpenLuaToolsIcon(titleIcon);
         const titleText = document.createElement("span");
         titleText.textContent = t("menu.title", "OpenLuaTools · Menu");
         title.appendChild(titleIcon);
@@ -6333,27 +6368,10 @@
       headerBtn.setAttribute("data-tooltip-text", "OpenLuaTools Settings");
 
       const img = document.createElement("img");
-      img.style.height = "18px";
-      img.style.width = "18px";
-      img.style.verticalAlign = "middle";
-
-      img.onerror = function () {
-        // cogwheel fallback
-        headerBtn.innerHTML =
-          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="OpenLuaTools"><path fill="currentColor" d="M12 8a4 4 0 100 8 4 4 0 000-8zm9.94 3.06l-2.12-.35a7.962 7.962 0 00-1.02-2.46l1.29-1.72a.75.75 0 00-.09-.97l-1.41-1.41a.75.75 0 00-.97-.09l-1.72 1.29c-.77-.44-1.6-.78-2.46-1.02L13.06 2.06A.75.75 0 0012.31 2h-1.62a.75.75 0 00-.75.65l-.35 2.12a7.962 7.962 0 00-2.46 1.02L5 4.6a.75.75 0 00-.97.09L2.62 6.1a.75.75 0 00-.09.97l1.29 1.72c-.44.77-.78 1.6-1.02 2.46l-2.12.35a.75.75 0 00-.65.75v1.62c0 .37.27.69.63.75l2.14.36c.24.86.58 1.69 1.02 2.46L2.53 18a.75.75 0 00.09.97l1.41 1.41c.26.26.67.29.97.09l1.72-1.29c.77.44 1.6.78 2.46 1.02l.35 2.12c.06.36.38.63.75.63h1.62c.37 0 .69-.27.75-.63l.36-2.14c.86-.24 1.69-.58 2.46-1.02l1.72 1.29c.3.2.71.17.97-.09l1.41-1.41c.26-.26.29-.67.09-.97l-1.29-1.72c.44-.77.78-1.6 1.02-2.46l2.12-.35c.36-.06.63-.38.63-.75v-1.62a.75.75 0 00-.65-.75z"/></svg>';
-      };
-
-      img.src = "OpenLuaTools/openluatools-icon.png";
-
-      Millennium.callServerMethod("openluatools", "GetIconDataUrl", {})
-        .then(function (res) {
-          const payload = typeof res === "string" ? JSON.parse(res) : res;
-          if (payload && payload.success && payload.dataUrl) {
-            img.src = payload.dataUrl;
-          }
-        })
-        .catch(function () {});
-
+      img.style.cssText =
+        "height:18px;width:18px;display:block;object-fit:contain;border-radius:3px;";
+      img.alt = "OpenLuaTools";
+      loadOpenLuaToolsIcon(img);
       headerBtn.appendChild(img);
 
       headerBtn.onclick = function (e) {

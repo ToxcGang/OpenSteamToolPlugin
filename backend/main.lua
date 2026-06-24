@@ -369,13 +369,14 @@ function StartAddViaOpenLuaToolsFromUrl(apiName, appid, contentScriptQuery, url)
 end
 
 function GetIconDataUrl()
-    -- Python read an icon file from the public dir and base64-encoded it
     local icon_path = paths.find_public_path("openluatools-icon.png")
     if icon_path and fs.exists(icon_path) then
         local content = m_utils.read_file(icon_path)
-        if content then
-            return json_ok({ success = true, dataUrl = "data:image/png;base64," ..
-            (m_utils.base64_encode and m_utils.base64_encode(content) or "") })
+        if content and m_utils.base64_encode then
+            local encoded = m_utils.base64_encode(content)
+            if encoded and encoded ~= "" then
+                return json_ok({ success = true, dataUrl = "data:image/png;base64," .. encoded })
+            end
         end
     end
     return json_ok({ success = false, error = "icon not found" })
