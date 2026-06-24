@@ -19,13 +19,25 @@ function steam_utils.detect_steam_install_path()
     return ""
 end
 
-function steam_utils.has_lua_for_app(appid)
+function steam_utils.get_opensteamtool_lua_dir()
     local base_path = steam_utils.detect_steam_install_path()
-    if not base_path or base_path == "" then return false end
+    if not base_path or base_path == "" then return nil end
+    return fs.join(base_path, "config", "lua")
+end
 
-    local stplug_path = fs.join(base_path, "config", "stplug-in")
-    local lua_file = fs.join(stplug_path, tostring(appid) .. ".lua")
-    local disabled_file = fs.join(stplug_path, tostring(appid) .. ".lua.disabled")
+function steam_utils.ensure_opensteamtool_lua_dir()
+    local lua_dir = steam_utils.get_opensteamtool_lua_dir()
+    if not lua_dir then return nil end
+    if not fs.exists(lua_dir) then fs.create_directories(lua_dir) end
+    return lua_dir
+end
+
+function steam_utils.has_lua_for_app(appid)
+    local lua_dir = steam_utils.get_opensteamtool_lua_dir()
+    if not lua_dir then return false end
+
+    local lua_file = fs.join(lua_dir, tostring(appid) .. ".lua")
+    local disabled_file = fs.join(lua_dir, tostring(appid) .. ".lua.disabled")
 
     return fs.exists(lua_file) or fs.exists(disabled_file)
 end
@@ -41,21 +53,21 @@ function steam_utils.get_game_install_path_response(appid)
     if not fs.exists(library_vdf_path) then
         return { success = false, error = "Could not find libraryfolders.vdf" }
     end
-    
+
     local vdf_content = m_utils.read_file(library_vdf_path)
     if not vdf_content then
         return { success = false, error = "Failed to read libraryfolders.vdf" }
     end
-    
+
     local all_library_paths = {}
     for path in vdf_content:gmatch('"path"%s+"([^"]+)"') do
         path = path:gsub("\\\\", "\\")
         table.insert(all_library_paths, path)
     end
-    
+
     local library_path = nil
     local appmanifest_path = nil
-    
+
     for _, lib_path in ipairs(all_library_paths) do
         local candidate = fs.join(lib_path, "steamapps", "appmanifest_" .. appid .. ".acf")
         if fs.exists(candidate) then
@@ -64,26 +76,26 @@ function steam_utils.get_game_install_path_response(appid)
             break
         end
     end
-    
+
     if not library_path or not appmanifest_path then
         return { success = false, error = "menu.error.notInstalled" }
     end
-    
+
     local manifest_content = m_utils.read_file(appmanifest_path)
     if not manifest_content then
         return { success = false, error = "Failed to parse appmanifest" }
     end
-    
+
     local install_dir = manifest_content:match('"installdir"%s+"([^"]+)"')
     if not install_dir then
         return { success = false, error = "Install directory not found" }
     end
-    
+
     local full_install_path = fs.join(library_path, "steamapps", "common", install_dir)
     if not fs.exists(full_install_path) then
         return { success = false, error = "Game directory not found" }
     end
-    
+
     return {
         success = true,
         installPath = full_install_path,
@@ -95,7 +107,7 @@ end
 
 function steam_utils.open_game_folder(path)
     if not path or path == "" or not fs.exists(path) then return false end
-    
+
     -- In Windows, explorer accepts backslashes
     path = path:gsub("/", "\\")
     local cmd = 'explorer "' .. path .. '"'

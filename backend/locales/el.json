@@ -223,6 +223,27 @@
     "{fix} applied successfully!": "Το {fix} εφαρμόστηκε επιτυχώς!",
     "settings.morrenusApiKey.label": "Κλειδί Morrenus API",
     "settings.morrenusApiKey.description": "Το κλειδί API απαιτείται για τη χρήση της Sadie Source. Αποκτήστε το από το {link}",
-    "settings.morrenusApiKey.placeholder": "Εισαγάγετε το κλειδί API"
+    "settings.morrenusApiKey.placeholder": "Εισαγάγετε το κλειδί API",
+    "Add Custom API": "translation missing",
+    "Custom API added successfully!": "translation missing",
+    "Name and URL are required.": "translation missing",
+    "Please enter a valid URL.": "translation missing",
+    "Please enter an API Key.": "translation missing",
+    "Require API Key": "translation missing",
+    "Save API": "translation missing",
+    "Saving...": "translation missing",
+    "URL must contain <apikey> when Require API Key is checked.": "translation missing",
+    "URL must contain <appid> placeholder.": "translation missing",
+    "URL must start with http:// or https://": "translation missing",
+    "settings.apiToggles.addSource": "translation missing",
+    "settings.apiToggles.clickToRename": "translation missing",
+    "settings.apiToggles.desc": "translation missing",
+    "settings.apiToggles.empty": "translation missing",
+    "settings.apiToggles.error": "translation missing",
+    "settings.apiToggles.remove": "translation missing",
+    "settings.apiToggles.title": "translation missing",
+    "settings.apiToggles.toggle": "translation missing",
+    "settings.pagination": "translation missing",
+    "settings.perPage": "translation missing"
   }
 }

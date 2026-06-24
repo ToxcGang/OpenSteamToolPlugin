@@ -6,16 +6,17 @@ local logger = require("plugin_logger")
 local paths = require("paths")
 local utils = require("plugin_utils")
 local steam_utils = require("steam_utils")
+local safety = require("safety")
 
 local auto_update = {}
 
 function auto_update.check_for_updates_now()
     local cfg_path = paths.backend_path(config.UPDATE_CONFIG_FILE)
     local cfg = utils.read_json(cfg_path)
-    
+
     local latest_version = ""
     local zip_url = ""
-    
+
     local gh_cfg = cfg.github
     if gh_cfg then
         local owner = gh_cfg.owner or ""
@@ -23,12 +24,12 @@ function auto_update.check_for_updates_now()
         local asset_name = gh_cfg.asset_name or "ltsteamplugin.zip"
         local tag = gh_cfg.tag or ""
         local tag_prefix = gh_cfg.tag_prefix or ""
-        
+
         local endpoint = "https://api.github.com/repos/" .. owner .. "/" .. repo .. "/releases/latest"
         if tag ~= "" then
             endpoint = "https://api.github.com/repos/" .. owner .. "/" .. repo .. "/releases/tags/" .. tag
         end
-        
+
         local resp = http_client.get(endpoint, {
             headers = {
                 ["Accept"] = "application/vnd.github+json",
@@ -43,23 +44,25 @@ function auto_update.check_for_updates_now()
             if tag_prefix ~= "" and latest_version:sub(1, #tag_prefix) == tag_prefix then
                 latest_version = latest_version:sub(#tag_prefix + 1)
             end
-            
+
             for _, asset in ipairs(data.assets or {}) do
                 if asset.name == asset_name then
                     zip_url = asset.browser_download_url
                     break
                 end
             end
-            if zip_url == "" and tag_name ~= "" then
-                zip_url = "https://luatools.vercel.app/api/get-plugin/" .. tag_name
-            end
         end
     end
-    
+
     if latest_version == "" or zip_url == "" then
         return { success = false, error = "Manifest missing version or zip_url" }
     end
-    
+
+    local ok_url, url_err = safety.validate_http_url(zip_url)
+    if not ok_url then
+        return { success = false, error = url_err }
+    end
+
     local current_version = utils.get_plugin_version()
 
     -- Compare version tables component by component (can't use <= on tables in Lua)
@@ -80,21 +83,21 @@ function auto_update.check_for_updates_now()
     if compare_versions(latest_version, current_version) <= 0 then
         return { success = true, message = "Up-to-date (current " .. current_version .. ")" }
     end
-    
+
     local pending_zip = paths.backend_path(config.UPDATE_PENDING_ZIP)
-    
+
     local is_windows = m_utils.getenv("OS") == "Windows_NT"
     local cmd
     if is_windows then
-        cmd = string.format('curl.exe -sL -A "discord(dot)gg/luatools" "%s" -o "%s" && tar.exe -xf "%s" -C "%s"', zip_url, pending_zip, pending_zip, paths.get_plugin_dir())
+        cmd = string.format('curl.exe -sL -A "LuaTools-OpenSteamTool" "%s" -o "%s" && tar.exe -xf "%s" -C "%s"', zip_url, pending_zip, pending_zip, paths.get_plugin_dir())
     else
         cmd = string.format('curl -L -o "%s" "%s" && unzip -o -q "%s" -d "%s"', pending_zip, zip_url, pending_zip, paths.get_plugin_dir())
     end
-    
+
     m_utils.exec(cmd)
-    
+
     if fs.exists(pending_zip) then fs.remove(pending_zip) end
-    
+
     local msg = "LuaTools updated to " .. latest_version .. ". Please restart Steam."
     return { success = true, message = msg }
 end

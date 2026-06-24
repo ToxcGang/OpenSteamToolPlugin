@@ -12,6 +12,7 @@ local paths            = require("paths")
 local steam_utils      = require("steam_utils")
 local utils            = require("plugin_utils")
 local locales_mod      = require("locales.manager")
+local safety           = require("safety")
 
 local api_manifest     = require("api_manifest")
 local downloads        = require("downloads")
@@ -376,8 +377,9 @@ end
 
 function DeleteLuaToolsForApp(appid)
     if type(appid) == "table" then appid = appid.appid end
-    local base = steam_utils.detect_steam_install_path()
-    local target_dir = fs.join(base, "config", "stplug-in")
+    local target_dir = steam_utils.get_opensteamtool_lua_dir()
+    if not target_dir then return json_err("Could not find OpenSteamTool Lua directory") end
+
     local candidates = {
         fs.join(target_dir, tostring(appid) .. ".lua"),
         fs.join(target_dir, tostring(appid) .. ".lua.disabled"),
@@ -450,9 +452,11 @@ end
 
 function GetInstalledLuaScripts()
     local ok, res = pcall(function()
-        local base = steam_utils.detect_steam_install_path()
-        local target_dir = fs.join(base, "config", "stplug-in")
+        local target_dir = steam_utils.get_opensteamtool_lua_dir()
         local scripts = {}
+        if not target_dir then
+            return { success = true, scripts = scripts }
+        end
         local ok2, files = pcall(fs.list, target_dir)
         if ok2 and files then
             for _, entry in ipairs(files) do
@@ -496,9 +500,9 @@ end
 function OpenExternalUrl(url)
     if type(url) == "table" then url = url.url end
     url = tostring(url or "")
-    if not (url:sub(1, 7) == "http://" or url:sub(1, 8) == "https://") then
-        return json_err("Invalid URL")
-    end
+    local ok_url, url_err = safety.validate_http_url(url)
+    if not ok_url then return json_err(url_err) end
+
     local is_win = (m_utils.getenv("OS") or ""):find("Windows") ~= nil
     if is_win then
         pcall(m_utils.exec, 'start "" "' .. url .. '"')

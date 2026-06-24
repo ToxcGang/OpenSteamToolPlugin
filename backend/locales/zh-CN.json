@@ -223,6 +223,27 @@
     "{fix} applied successfully!": "{fix}已成功应用！",
     "settings.morrenusApiKey.label": "Morrenus API 密钥",
     "settings.morrenusApiKey.description": "使用 Sadie Source 需要 API 密钥。从 {link} 获取",
-    "settings.morrenusApiKey.placeholder": "输入您的 API 密钥"
+    "settings.morrenusApiKey.placeholder": "输入您的 API 密钥",
+    "Add Custom API": "translation missing",
+    "Custom API added successfully!": "translation missing",
+    "Name and URL are required.": "translation missing",
+    "Please enter a valid URL.": "translation missing",
+    "Please enter an API Key.": "translation missing",
+    "Require API Key": "translation missing",
+    "Save API": "translation missing",
+    "Saving...": "translation missing",
+    "URL must contain <apikey> when Require API Key is checked.": "translation missing",
+    "URL must contain <appid> placeholder.": "translation missing",
+    "URL must start with http:// or https://": "translation missing",
+    "settings.apiToggles.addSource": "translation missing",
+    "settings.apiToggles.clickToRename": "translation missing",
+    "settings.apiToggles.desc": "translation missing",
+    "settings.apiToggles.empty": "translation missing",
+    "settings.apiToggles.error": "translation missing",
+    "settings.apiToggles.remove": "translation missing",
+    "settings.apiToggles.title": "translation missing",
+    "settings.apiToggles.toggle": "translation missing",
+    "settings.pagination": "translation missing",
+    "settings.perPage": "translation missing"
   }
 }

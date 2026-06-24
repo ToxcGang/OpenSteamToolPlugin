@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/SteamClientHomebrew/Millennium/main/src/sys/plugin-schema.json",
   "name": "luatools",
   "common_name": "LuaTools",
-  "description": "LuaTools Steam Plugin!",
+  "description": "LuaTools Millennium plugin for OpenSteamTool.",
   "version": "8.0.4",
   "backendType": "lua",
   "include": [
