@@ -50,9 +50,9 @@ end
 
 local function _available_theme_files()
     local themes = {}
-    
-    local themes_json_path = fs.join(paths.get_plugin_dir(), "public", "themes", "themes.json")
-    if fs.exists(themes_json_path) then
+
+    local themes_json_path = paths.find_public_path(fs.join("themes", "themes.json"))
+    if themes_json_path and fs.exists(themes_json_path) then
         local success, data = pcall(cjson.decode, utils.read_text(themes_json_path))
         if success and type(data) == "table" then
             for _, item in ipairs(data) do
@@ -64,8 +64,8 @@ local function _available_theme_files()
     end
 
     if #themes == 0 then
-        local themes_dir = fs.join(paths.get_plugin_dir(), "public", "themes")
-        if fs.exists(themes_dir) then
+        local themes_dir = paths.find_public_path("themes")
+        if themes_dir and fs.exists(themes_dir) then
             local success, files = pcall(fs.list, themes_dir)
             if success and files then
                 for _, entry in ipairs(files) do

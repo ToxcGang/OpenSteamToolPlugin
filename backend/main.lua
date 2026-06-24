@@ -22,10 +22,29 @@ local auto_update      = require("auto_update")
 
 -- ── Helpers ──────────────────────────────────────────────────────────────────
 
+local JSON_ARRAY_FIELDS = {
+    "apis",
+    "results",
+    "apps",
+    "deleted",
+    "fixes",
+    "scripts",
+    "themes",
+    "schema",
+    "locales",
+}
+
+local function normalize_empty_arrays(json)
+    for _, field in ipairs(JSON_ARRAY_FIELDS) do
+        json = json:gsub('"' .. field .. '":{}', '"' .. field .. '":[]')
+    end
+    return json
+end
+
 --- Safely encode a Lua table to a JSON string (same as Python json.dumps).
 local function json_ok(data)
     local ok, s = pcall(cjson.encode, data)
-    if ok then return s end
+    if ok then return normalize_empty_arrays(s) end
     logger.warn("json_ok encode failed: " .. tostring(s))
     return '{"success":false,"error":"serialization error"}'
 end
@@ -36,6 +55,48 @@ end
 
 -- ── Webkit file management ───────────────────────────────────────────────────
 
+local function copy_file(src, dst, root)
+    if not src or not fs.exists(src) then return false end
+    local ok, err = safety.copy_file(src, dst, root)
+    if not ok then
+        logger.warn("copy_webkit_files failed for " .. tostring(src) .. ": " .. tostring(err))
+        return false
+    end
+    return true
+end
+
+local function copy_public_file(public_name, dst, root)
+    return copy_file(paths.find_public_path(public_name), dst, root)
+end
+
+local function copy_public_directory(public_name, dst_dir, root)
+    local src_dir = paths.find_public_path(public_name)
+    if not src_dir or not fs.exists(src_dir) then
+        logger.warn("copy_webkit_files missing public asset directory: " .. tostring(public_name))
+        return
+    end
+
+    if not fs.exists(dst_dir) then
+        fs.create_directories(dst_dir)
+    end
+
+    local ok, entries = pcall(fs.list, src_dir)
+    if not ok or not entries then
+        logger.warn("copy_webkit_files failed to list " .. tostring(src_dir))
+        return
+    end
+
+    for _, entry in ipairs(entries) do
+        if not entry.is_directory then
+            local name = entry.name or ""
+            local src = entry.path or fs.join(src_dir, name)
+            if name ~= "" then
+                copy_file(src, fs.join(dst_dir, name), root)
+            end
+        end
+    end
+end
+
 local function copy_webkit_files()
     local steam_dir = steam_utils.detect_steam_install_path()
     if not steam_dir or steam_dir == "" then return end
@@ -45,21 +106,15 @@ local function copy_webkit_files()
         fs.create_directories(target_webkit_dir)
     end
 
-    local public_dir = fs.join(paths.get_plugin_dir(), "public")
+    copy_public_file("luatools.js", fs.join(target_webkit_dir, "luatools.js"), target_webkit_dir)
+    copy_public_file("steamdb-webkit.css", fs.join(target_webkit_dir, "steamdb-webkit.css"), target_webkit_dir)
+    copy_public_directory("themes", fs.join(target_webkit_dir, "themes"), target_webkit_dir)
 
-    local src_js = fs.join(public_dir, "luatools.js")
-    local dst_js = fs.join(target_webkit_dir, "luatools.js")
-    if fs.exists(src_js) then
-        local content = m_utils.read_file(src_js)
-        if content then m_utils.write_file(dst_js, content) end
+    local luatools_dir = fs.join(target_webkit_dir, "LuaTools")
+    if not fs.exists(luatools_dir) then
+        fs.create_directories(luatools_dir)
     end
-
-    local src_css = fs.join(public_dir, "steamdb-webkit.css")
-    local dst_css = fs.join(target_webkit_dir, "steamdb-webkit.css")
-    if fs.exists(src_css) then
-        local content = m_utils.read_file(src_css)
-        if content then m_utils.write_file(dst_css, content) end
-    end
+    copy_public_file("luatools-icon.png", fs.join(luatools_dir, "luatools-icon.png"), target_webkit_dir)
 end
 
 local function inject_webkit_files()
@@ -278,14 +333,6 @@ function CheckApisForApp(appid)
     if type(appid) == "table" then appid = appid.appid end
     local ok, res = pcall(downloads.check_apis_for_app, tonumber(appid))
     if not ok then return json_err(res) end
-
-    -- Ensure empty arrays encode as [] and not {}
-    if res and type(res.results) == "table" and #res.results == 0 then
-        -- Serialize manually or inject cjson.empty_array
-        local success_json = res.success and "true" or "false"
-        return '{"success":' .. success_json .. ',"results":[]}'
-    end
-
     return json_ok(res)
 end
 
@@ -323,8 +370,8 @@ end
 
 function GetIconDataUrl()
     -- Python read an icon file from the public dir and base64-encoded it
-    local icon_path = fs.join(paths.get_plugin_dir(), "public", "luatools-icon.png")
-    if fs.exists(icon_path) then
+    local icon_path = paths.find_public_path("luatools-icon.png")
+    if icon_path and fs.exists(icon_path) then
         local content = m_utils.read_file(icon_path)
         if content then
             return json_ok({ success = true, dataUrl = "data:image/png;base64," ..
@@ -530,10 +577,10 @@ function GetSettingsConfig()
 end
 
 function GetThemes()
-    local themes_json_path = fs.join(paths.get_plugin_dir(), "public", "themes", "themes.json")
+    local themes_json_path = paths.find_public_path(fs.join("themes", "themes.json"))
     local themes_array = {}
 
-    if fs.exists(themes_json_path) then
+    if themes_json_path and fs.exists(themes_json_path) then
         local success, data = pcall(cjson.decode, utils.read_text(themes_json_path))
         if success and type(data) == "table" then
             themes_array = data

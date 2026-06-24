@@ -10,6 +10,110 @@ local api_manifest = {}
 local _APIS_INIT_DONE = false
 local _INIT_APIS_LAST_MESSAGE = ""
 
+local DEFAULT_API_LIST = {
+    {
+        name = "Morrenus",
+        url = "https://hubcapmanifest.com/api/v1/manifest/<appid>?api_key=<moapikey>",
+        success_code = 200,
+        unavailable_code = 404,
+        enabled = true
+    },
+    {
+        name = "Ryuu",
+        url = "http://167.235.229.108/<appid>",
+        success_code = 200,
+        unavailable_code = 404,
+        enabled = true
+    },
+    {
+        name = "TwentyTwo Cloud",
+        url = "https://api.twentytwocloud.com/download?appid=<appid>",
+        success_code = 200,
+        unavailable_code = 404,
+        enabled = true
+    },
+    {
+        name = "Sushi",
+        url = "https://raw.githubusercontent.com/sushi-dev55-alt/sushitools-games-repo-alt/refs/heads/main/<appid>.zip",
+        success_code = 200,
+        unavailable_code = 404,
+        enabled = true
+    }
+}
+
+local function copy_default_api_list()
+    local copy = {}
+    for _, api in ipairs(DEFAULT_API_LIST) do
+        table.insert(copy, {
+            name = api.name,
+            url = api.url,
+            success_code = api.success_code,
+            unavailable_code = api.unavailable_code,
+            enabled = api.enabled
+        })
+    end
+    return copy
+end
+
+local function is_valid_api_manifest(data)
+    return type(data) == "table" and type(data.api_list) == "table"
+end
+
+local function write_api_manifest(path, data)
+    local text = utils.encode_json(data)
+    local normalized = utils.normalize_manifest_text(text)
+    if normalized == "" then normalized = text end
+    utils.write_text(path, normalized)
+end
+
+local function seed_default_api_manifest(path)
+    local data = { api_list = copy_default_api_list() }
+    write_api_manifest(path, data)
+    return #data.api_list
+end
+
+local function read_api_manifest(path)
+    local data = utils.read_json(path)
+    if is_valid_api_manifest(data) then
+        return data
+    end
+    return nil
+end
+
+local function fetch_remote_manifest_text()
+    logger.log("InitApis: Fetching manifest from " .. config.API_MANIFEST_URL)
+    local resp = http_client.get(config.API_MANIFEST_URL, { timeout = 15 })
+    if resp and resp.status == 200 and resp.body then
+        logger.log("InitApis: Fetched manifest, length=" .. tostring(#resp.body))
+        return resp.body
+    end
+
+    logger.warn("InitApis: Primary URL failed, trying proxy...")
+    resp = http_client.get(config.API_MANIFEST_PROXY_URL, { timeout = config.HTTP_PROXY_TIMEOUT_SECONDS })
+    if resp and resp.status == 200 and resp.body then
+        logger.log("InitApis: Fetched manifest from proxy, length=" .. tostring(#resp.body))
+        return resp.body
+    end
+
+    logger.warn("InitApis: Proxy also failed")
+    return ""
+end
+
+local function ensure_api_manifest_data()
+    local path = paths.backend_path(config.API_JSON_FILE)
+    local data = read_api_manifest(path)
+    if data then return data end
+
+    logger.warn("LuaTools: api.json missing or invalid; attempting to initialize")
+    pcall(api_manifest.init_apis)
+    data = read_api_manifest(path)
+    if data then return data end
+
+    logger.warn("LuaTools: seeding bundled default API manifest")
+    seed_default_api_manifest(path)
+    return read_api_manifest(path) or { api_list = {} }
+end
+
 function api_manifest.init_apis()
     logger.log("InitApis: invoked")
     if _APIS_INIT_DONE then
@@ -20,27 +124,11 @@ function api_manifest.init_apis()
     local api_json_path = paths.backend_path(config.API_JSON_FILE)
     local message = ""
 
-    if fs.exists(api_json_path) then
+    if fs.exists(api_json_path) and read_api_manifest(api_json_path) then
         logger.log("InitApis: Local file exists -> " .. api_json_path .. "; skipping remote fetch")
     else
-        logger.log("InitApis: Local file not found -> " .. api_json_path)
-        local manifest_text = ""
-        
-        logger.log("InitApis: Fetching manifest from " .. config.API_MANIFEST_URL)
-        local resp = http_client.get(config.API_MANIFEST_URL, { timeout = 15 })
-        if resp and resp.status == 200 and resp.body then
-            manifest_text = resp.body
-            logger.log("InitApis: Fetched manifest, length=" .. tostring(#manifest_text))
-        else
-            logger.warn("InitApis: Primary URL failed, trying proxy...")
-            resp = http_client.get(config.API_MANIFEST_PROXY_URL, { timeout = config.HTTP_PROXY_TIMEOUT_SECONDS })
-            if resp and resp.status == 200 and resp.body then
-                manifest_text = resp.body
-                logger.log("InitApis: Fetched manifest from proxy, length=" .. tostring(#manifest_text))
-            else
-                logger.warn("InitApis: Proxy also failed")
-            end
-        end
+        logger.log("InitApis: Local file missing or invalid -> " .. api_json_path)
+        local manifest_text = fetch_remote_manifest_text()
 
         local normalized = ""
         if manifest_text ~= "" then
@@ -53,8 +141,9 @@ function api_manifest.init_apis()
             message = "No API's Configured, Loaded " .. tostring(count) .. " Free Ones :D"
             logger.log("InitApis: Wrote new api.json with " .. tostring(count) .. " entries")
         else
-            message = "No API's Configured and failed to load free ones"
-            logger.warn("InitApis: Manifest empty, nothing written")
+            local count = seed_default_api_manifest(api_json_path)
+            message = "No API's Configured, Loaded " .. tostring(count) .. " bundled defaults"
+            logger.warn("InitApis: Manifest empty, wrote bundled defaults")
         end
     end
 
@@ -124,7 +213,7 @@ function api_manifest.load_api_manifest()
         text = normalized
     end
 
-    local data = utils.read_json(path)
+    local data = ensure_api_manifest_data()
     local apis = {}
     if data and type(data.api_list) == "table" then
         for _, api in ipairs(data.api_list) do
@@ -201,8 +290,7 @@ function api_manifest.get_api_list()
 end
 
 function api_manifest.get_all_apis()
-    local path = paths.backend_path(config.API_JSON_FILE)
-    local data = utils.read_json(path)
+    local data = ensure_api_manifest_data()
     local apis = {}
     if data and type(data.api_list) == "table" then
         for _, api in ipairs(data.api_list) do
