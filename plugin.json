@@ -3,7 +3,7 @@
   "name": "openluatools",
   "common_name": "OpenLuaTools",
   "description": "OpenLuaTools Millennium plugin for OpenSteamTool.",
-  "version": "8.0.4",
+  "version": "1.0.0",
   "backendType": "lua",
   "include": [
     "public"

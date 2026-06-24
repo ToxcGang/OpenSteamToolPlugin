@@ -1,8 +1,10 @@
 # OpenLuaTools for OpenSteamTool
 
-This fork keeps the OpenLuaTools Millennium plugin UI and backend namespace, but targets
-[OpenSteamTool](https://github.com/OpenSteam001/OpenSteamTool) instead of the legacy
-SteamTools layout.
+OpenLuaTools is LuaTools for OpenSteamTool.
+
+OpenLuaTools is the OpenSteamTool-compatible continuation of LuaTools as a
+Millennium plugin. It targets [OpenSteamTool](https://github.com/OpenSteam001/OpenSteamTool)
+instead of the legacy SteamTools layout.
 
 ## What changed
 
