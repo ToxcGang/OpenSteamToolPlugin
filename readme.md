@@ -14,6 +14,8 @@ instead of the legacy SteamTools layout.
   OpenSteamTool supports manifest pinning.
 - Update checks point at `ToxcGang/OpenSteamToolPlugin` and no longer fall back to
   the original upstream package host.
+- Auto-updates are distributed through GitHub Releases using the
+  `OpenSteamToolPlugin.zip` release asset.
 - Downloaded Lua and fix archives are extracted to a temporary plugin directory
   first, then validated before files are copied into Steam or game folders.
 

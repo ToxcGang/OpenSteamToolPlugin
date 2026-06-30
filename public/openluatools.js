@@ -67,8 +67,7 @@
             transition: transform 0.15s ease, background-color 0.15s ease !important;
         }
 
-        .openluatools-button.active-focus,
-        .openluatools-restart-button.active-focus {
+        .openluatools-button.active-focus {
             transform: scale(1.05) !important;
             background: linear-gradient(135deg, rgba(102, 192, 244, 0.3), rgba(102, 192, 244, 0.2)) !important;
         }
@@ -2113,24 +2112,6 @@
   }
 
   // Translations are loaded by fetchSettingsConfig() in onFrontendReady — no separate preload needed.
-
-  function askRestartConfirmation() {
-    showOpenLuaToolsConfirm(
-      "OpenLuaTools",
-      lt("Restart Steam now?"),
-      function () {
-        try {
-          Millennium.callServerMethod("openluatools", "RestartSteam", {
-            contentScriptQuery: "",
-          });
-          // SteamClient.User.StartRestart(true) Unreliable, closes but doesn't restart (on my pc)
-        } catch (_) {}
-      },
-      function () {
-        /* Cancel - do nothing */
-      },
-    );
-  }
 
   let settingsMenuPending = false;
 
@@ -6253,7 +6234,6 @@
       const style = document.createElement("style");
       style.id = "openluatools-spacing-styles";
       style.textContent = `
-                .openluatools-restart-button { margin-left: 6px !important; margin-right: 6px !important; }
                 .openluatools-button { margin-right: 0 !important; position: relative !important; }
                 .openluatools-pills-container {
                     position: absolute !important;
@@ -6294,18 +6274,6 @@
   // Function to update button text with current translations
   function updateButtonTranslations() {
     try {
-      // Update Restart Steam button
-      const restartBtn = document.querySelector(".openluatools-restart-button");
-      if (restartBtn) {
-        const restartText = lt("Restart Steam");
-        restartBtn.title = restartText;
-        restartBtn.setAttribute("data-tooltip-text", restartText);
-        const rspan = restartBtn.querySelector("span");
-        if (rspan) {
-          rspan.textContent = restartText;
-        }
-      }
-
       // Update Add via OpenLuaTools button
       const openluatoolsBtn = document.querySelector(".openluatools-button");
       if (openluatoolsBtn) {
@@ -6341,7 +6309,6 @@
       // Page changed - reset button insertion flag and update translations
       window.__OpenLuaToolsLastUrl = currentUrl;
       window.__OpenLuaToolsButtonInserted = false;
-      window.__OpenLuaToolsRestartInserted = false;
       window.__OpenLuaToolsIconInserted = false;
       window.__OpenLuaToolsHeaderInserted = false;
       window.__OpenLuaToolsPresenceCheckInFlight = false;
@@ -6404,65 +6371,6 @@
     if (targetContainer) {
       const steamdbContainer = targetContainer;
 
-      // Insert a Restart Steam button between Community Hub and our OpenLuaTools button
-      try {
-        if (
-          !document.querySelector(".openluatools-restart-button") &&
-          !window.__OpenLuaToolsRestartInserted
-        ) {
-          ensureStyles();
-          // In Big Picture mode, use queue button as reference; otherwise use first link in container
-          const referenceBtn = isBigPicture
-            ? document.querySelector("#queueBtnFollow")
-            : steamdbContainer.querySelector("a");
-
-          // Use same custom button for both modes
-          const restartBtn = document.createElement("a");
-          if (referenceBtn && referenceBtn.className) {
-            restartBtn.className =
-              referenceBtn.className + " openluatools-restart-button";
-          } else {
-            restartBtn.className =
-              "btnv6_blue_hoverfade btn_medium openluatools-restart-button";
-          }
-          restartBtn.href = "#";
-          const restartText = lt("Restart Steam");
-          restartBtn.title = restartText;
-          restartBtn.setAttribute("data-tooltip-text", restartText);
-          const rspan = document.createElement("span");
-          rspan.textContent = restartText;
-          restartBtn.appendChild(rspan);
-
-          // Normalize margins to match native buttons
-          try {
-            if (referenceBtn) {
-              const cs = window.getComputedStyle(referenceBtn);
-              restartBtn.style.marginLeft = cs.marginLeft;
-              restartBtn.style.marginRight = cs.marginRight;
-            }
-          } catch (_) {}
-
-          restartBtn.addEventListener("click", function (e) {
-            e.preventDefault();
-            try {
-              // Ensure any settings overlays are closed before confirm
-              closeSettingsOverlay();
-              askRestartConfirmation();
-            } catch (_) {
-              askRestartConfirmation();
-            }
-          });
-
-          if (referenceBtn && referenceBtn.parentElement) {
-            referenceBtn.after(restartBtn);
-          } else {
-            steamdbContainer.appendChild(restartBtn);
-          }
-          window.__OpenLuaToolsRestartInserted = true;
-          backendLog("Inserted Restart Steam button");
-        }
-      } catch (_) {}
-
       // Status Pills Logic
       // Always update translations for existing buttons (even if not a page change)
       const existingBtn = document.querySelector(".openluatools-button");
@@ -6516,6 +6424,23 @@
           );
         });
 
+        function insertOpenLuaToolsButton() {
+          if (
+            document.querySelector(".openluatools-button") ||
+            window.__OpenLuaToolsButtonInserted
+          ) {
+            return;
+          }
+
+          if (referenceBtn && referenceBtn.after) {
+            referenceBtn.after(openluatoolsButton);
+          } else {
+            steamdbContainer.appendChild(openluatoolsButton);
+          }
+          window.__OpenLuaToolsButtonInserted = true;
+          backendLog("OpenLuaTools button inserted");
+        }
+
         // Before inserting, ask backend if OpenLuaTools already exists for this appid
         try {
           const match =
@@ -6555,75 +6480,18 @@
                   return; // do not insert
                 }
                 // Re-check in case another caller inserted during async
-                if (
-                  !document.querySelector(".openluatools-button") &&
-                  !window.__OpenLuaToolsButtonInserted
-                ) {
-                  // Insert after restart button (order: Restart → Add)
-                  const restartExisting = steamdbContainer.querySelector(
-                    ".openluatools-restart-button",
-                  );
-                  if (restartExisting && restartExisting.after) {
-                    restartExisting.after(openluatoolsButton);
-                  } else if (referenceBtn && referenceBtn.after) {
-                    referenceBtn.after(openluatoolsButton);
-                  } else {
-                    steamdbContainer.appendChild(openluatoolsButton);
-                  }
-                  window.__OpenLuaToolsButtonInserted = true;
-                  backendLog("OpenLuaTools button inserted");
-                }
+                insertOpenLuaToolsButton();
                 window.__OpenLuaToolsPresenceCheckInFlight = false;
               } catch (_) {
-                if (
-                  !document.querySelector(".openluatools-button") &&
-                  !window.__OpenLuaToolsButtonInserted
-                ) {
-                  steamdbContainer.appendChild(openluatoolsButton);
-                  window.__OpenLuaToolsButtonInserted = true;
-                  backendLog("OpenLuaTools button inserted");
-                }
+                insertOpenLuaToolsButton();
                 window.__OpenLuaToolsPresenceCheckInFlight = false;
               }
             });
           } else {
-            if (
-              !document.querySelector(".openluatools-button") &&
-              !window.__OpenLuaToolsButtonInserted
-            ) {
-              // Insert after restart button (order: Restart → Add)
-              const restartExisting = steamdbContainer.querySelector(
-                ".openluatools-restart-button",
-              );
-              if (restartExisting && restartExisting.after) {
-                restartExisting.after(openluatoolsButton);
-              } else if (referenceBtn && referenceBtn.after) {
-                referenceBtn.after(openluatoolsButton);
-              } else {
-                steamdbContainer.appendChild(openluatoolsButton);
-              }
-              window.__OpenLuaToolsButtonInserted = true;
-              backendLog("OpenLuaTools button inserted");
-            }
+            insertOpenLuaToolsButton();
           }
         } catch (_) {
-          if (
-            !document.querySelector(".openluatools-button") &&
-            !window.__OpenLuaToolsButtonInserted
-          ) {
-            const restartExisting = steamdbContainer.querySelector(
-              ".openluatools-restart-button",
-            );
-            if (restartExisting && restartExisting.after) {
-              restartExisting.after(openluatoolsButton);
-            } else if (referenceBtn && referenceBtn.after) {
-              referenceBtn.after(openluatoolsButton);
-            } else {
-              steamdbContainer.appendChild(openluatoolsButton);
-            }
-            window.__OpenLuaToolsButtonInserted = true;
-            backendLog("OpenLuaTools button inserted");
-          }
+          insertOpenLuaToolsButton();
         }
       }
 
@@ -6869,19 +6737,7 @@
           try {
             const payload = typeof res === "string" ? JSON.parse(res) : res;
             if (payload && payload.message) {
-              const msg = String(payload.message);
-              // Check if this is an update message (contains "update" or "restart")
-              const isUpdateMsg =
-                msg.toLowerCase().includes("update") ||
-                msg.toLowerCase().includes("restart");
-
-              if (isUpdateMsg) {
-                // For update messages, use confirm dialog with OK (restart) and Cancel options
-                askRestartConfirmation();
-              } else {
-                // For non-update messages, use regular alert
-                ShowOpenLuaToolsAlert("OpenLuaTools", msg);
-              }
+              ShowOpenLuaToolsAlert("OpenLuaTools", String(payload.message));
             }
           } catch (_) {}
         });
@@ -7834,7 +7690,6 @@
       lastUrl = currentUrl;
       // URL changed - reset flags and update buttons
       window.__OpenLuaToolsButtonInserted = false;
-      window.__OpenLuaToolsRestartInserted = false;
       window.__OpenLuaToolsIconInserted = false;
       window.__OpenLuaToolsHeaderInserted = false;
 

@@ -106,8 +106,6 @@
     "Remove via OpenLuaTools": "OpenLuaTools로 제거",
     "Removed {count} files. Running Steam verification...": "{count}개 파일 제거됨. Steam 검증 실행 중...",
     "Removing fix files...": "수정 파일 제거 중...",
-    "Restart Steam": "Steam 재시작",
-    "Restart Steam now?": "지금 Steam을 재시작하시겠습니까?",
     "Searching across sources...": "소스 검색 중...",
     "Select Download Source": "다운로드 소스 선택",
     "Settings": "설정",

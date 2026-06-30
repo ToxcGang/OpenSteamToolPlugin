@@ -220,14 +220,6 @@ function CheckForUpdatesNow()
     return json_ok(res)
 end
 
-function RestartSteam()
-    local ok, success = pcall(auto_update.restart_steam)
-    if ok and success then
-        return json_ok({ success = true })
-    end
-    return json_ok({ success = false, error = "Failed to restart Steam" })
-end
-
 function HasOpenLuaToolsForApp(appid)
     if type(appid) == "table" then appid = appid.appid end
     local ok, exists = pcall(steam_utils.has_lua_for_app, tonumber(appid))

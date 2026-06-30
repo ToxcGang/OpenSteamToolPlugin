@@ -106,8 +106,6 @@
     "Remove via OpenLuaTools": "ลบผ่าน OpenLuaTools",
     "Removed {count} files. Running Steam verification...": "ลบ {count} ไฟล์แล้ว กำลังตรวจสอบผ่าน Steam...",
     "Removing fix files...": "กำลังลบไฟล์แก้ไข...",
-    "Restart Steam": "รีสตาร์ท Steam",
-    "Restart Steam now?": "รีสตาร์ท Steam ตอนนี้เลยไหม?",
     "Searching across sources...": "กำลังค้นหาจากแหล่งต่างๆ...",
     "Select Download Source": "เลือกแหล่งดาวน์โหลด",
     "Settings": "การตั้งค่า",

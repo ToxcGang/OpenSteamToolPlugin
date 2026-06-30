@@ -106,8 +106,6 @@
     "Remove via OpenLuaTools": "通过OpenLuaTools移除",
     "Removed {count} files. Running Steam verification...": "已删除{count}个文件。正在运行Steam验证...",
     "Removing fix files...": "正在删除修复文件...",
-    "Restart Steam": "重启Steam",
-    "Restart Steam now?": "现在重启Steam吗？",
     "Searching across sources...": "跨源搜索中...",
     "Select Download Source": "选择下载源",
     "Settings": "设置",

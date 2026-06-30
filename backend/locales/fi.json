@@ -106,8 +106,6 @@
     "Remove via OpenLuaTools": "Poista OpenLuaTools-työkalulla",
     "Removed {count} files. Running Steam verification...": "{count} tiedostoa poistettu. Suoritetaan Steam-vahvistus...",
     "Removing fix files...": "Poistetaan korjaustiedostoja...",
-    "Restart Steam": "Käynnistä Steam uudelleen",
-    "Restart Steam now?": "Käynnistetäänkö Steam uudelleen nyt?",
     "Searching across sources...": "Etsitään kaikista lähteistä...",
     "Select Download Source": "Valitse latauslähde",
     "Settings": "Asetukset",

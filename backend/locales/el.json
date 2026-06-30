@@ -106,8 +106,6 @@
     "Remove via OpenLuaTools": "Αφαίρεση μέσω OpenLuaTools",
     "Removed {count} files. Running Steam verification...": "Αφαιρέθηκαν {count} αρχεία. Εκτελείται επαλήθευση Steam...",
     "Removing fix files...": "Αφαίρεση αρχείων διόρθωσης...",
-    "Restart Steam": "Επανεκκίνηση του Steam",
-    "Restart Steam now?": "Επανεκκίνηση του Steam τώρα;",
     "Searching across sources...": "Αναζήτηση σε όλες τις πηγές...",
     "Select Download Source": "Επιλογή πηγής λήψης",
     "Settings": "Ρυθμίσεις",

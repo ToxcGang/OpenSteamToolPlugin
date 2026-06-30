@@ -106,8 +106,6 @@
     "Remove via OpenLuaTools": "Удалить из библиотеки",
     "Removed {count} files. Running Steam verification...": "Удалено файлов: {count}. Запуск проверки Steam...",
     "Removing fix files...": "Удаление файлов исправления...",
-    "Restart Steam": "Перезапустить Steam",
-    "Restart Steam now?": "Перезапустить Steam сейчас?",
     "Searching across sources...": "Поиск по всем источникам...",
     "Select Download Source": "Выберите источник загрузки",
     "Settings": "Настройки",

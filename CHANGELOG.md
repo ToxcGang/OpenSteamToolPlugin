@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 - 2026-06-30
+
+- Removed the Restart Steam button and restart prompt flow for OpenSteamTool.
+- Hardened GitHub Releases auto-updates by staging release ZIPs in a temp directory and validating extracted paths before copying files.
+- Kept OpenLuaTools focused on OpenSteamTool-only behavior.
+
 ## 1.0.0 - 2026-06-24
 
 - Renamed the plugin to OpenLuaTools with the `openluatools` Millennium namespace.
