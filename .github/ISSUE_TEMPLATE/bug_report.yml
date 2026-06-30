@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible problem with OpenLuaTools.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Please include enough detail to reproduce it.
+  - type: input
+    id: version
+    attributes:
+      label: OpenLuaTools version
+      description: The version shown in plugin.json or your installed plugin manager.
+      placeholder: "1.0.2"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Include Windows version, Steam client type, Millennium version, and OpenSteamTool version if known.
+      placeholder: "Windows 11, Steam stable, Millennium x.y.z, OpenSteamTool x.y.z"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: List the exact steps needed to trigger the issue.
+      placeholder: |
+        1. Open Steam store page...
+        2. Click...
+        3. See...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant logs or attach screenshots if available.
+      render: text
+    validations:
+      required: false

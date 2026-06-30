@@ -6230,11 +6230,23 @@
 
   // Ensure consistent spacing for our buttons
   function ensureStyles() {
-    if (!document.getElementById("openluatools-spacing-styles")) {
-      const style = document.createElement("style");
-      style.id = "openluatools-spacing-styles";
-      style.textContent = `
-                .openluatools-button { margin-right: 0 !important; position: relative !important; }
+    const spacingStyles = `
+                .openluatools-button {
+                    margin-left: 8px !important;
+                    margin-right: 0 !important;
+                    position: relative !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    box-sizing: border-box !important;
+                    vertical-align: middle !important;
+                }
+                .openluatools-button > span {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    white-space: nowrap !important;
+                }
                 .openluatools-pills-container {
                     position: absolute !important;
                     top: -25px !important;
@@ -6267,8 +6279,13 @@
                 .openluatools-pill.orange { background: rgba(255, 136, 0, 0.15); color: #ff8800; border: 1px solid rgba(255, 136, 0, 0.3); }
                 .openluatools-pill.gray { background: rgba(150, 150, 150, 0.15); color: #a0a0a0; border: 1px solid rgba(150, 150, 150, 0.3); }
             `;
+    let style = document.getElementById("openluatools-spacing-styles");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "openluatools-spacing-styles";
       document.head.appendChild(style); // This is now separate from the main style block
     }
+    style.textContent = spacingStyles;
   }
 
   // Function to update button text with current translations
@@ -6407,14 +6424,9 @@
         openluatoolsButton.title = addViaText;
         openluatoolsButton.setAttribute("data-tooltip-text", addViaText);
 
-        // Normalize margins to match native buttons
-        try {
-          if (referenceBtn) {
-            const cs = window.getComputedStyle(referenceBtn);
-            openluatoolsButton.style.marginLeft = cs.marginLeft;
-            openluatoolsButton.style.marginRight = cs.marginRight;
-          }
-        } catch (_) {}
+        // Keep our own gap so copied Steam button classes cannot collide with the reference button.
+        openluatoolsButton.style.marginLeft = "";
+        openluatoolsButton.style.marginRight = "";
 
         // Local click handler suppressed; delegated handler manages actions
         openluatoolsButton.addEventListener("click", function (e) {

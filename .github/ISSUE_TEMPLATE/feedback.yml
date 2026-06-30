@@ -1,0 +1,38 @@
+name: Feedback
+description: Share an idea, usability concern, or general feedback for OpenLuaTools.
+title: "[Feedback]: "
+labels:
+  - feedback
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for ideas, workflow friction, UI feedback, or non-bug suggestions.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Store page UI
+        - Settings
+        - Downloads
+        - Fixes
+        - Updates
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: feedback
+    attributes:
+      label: Feedback
+      description: Describe the idea or concern.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Add screenshots, examples, or why this would help.
+    validations:
+      required: false

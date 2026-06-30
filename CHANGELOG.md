@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2 - 2026-06-30
+
+- Fixed Community Hub and Add via OpenLuaTools button spacing on Steam store pages.
+- Added GitHub issue and feedback templates.
+- Added MIT license and security reporting policy.
+
 ## 1.0.1 - 2026-06-30
 
 - Removed the Restart Steam button and restart prompt flow for OpenSteamTool.
