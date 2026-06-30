@@ -6231,9 +6231,18 @@
   // Ensure consistent spacing for our buttons
   function ensureStyles() {
     const spacingStyles = `
-                .openluatools-button {
-                    margin-left: 8px !important;
+                .openluatools-button-slot {
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    margin-left: 10px !important;
                     margin-right: 0 !important;
+                    vertical-align: middle !important;
+                    position: relative !important;
+                    flex: 0 0 auto !important;
+                }
+                .openluatools-button {
+                    margin: 0 !important;
+                    float: none !important;
                     position: relative !important;
                     display: inline-flex !important;
                     align-items: center !important;
@@ -6286,6 +6295,34 @@
       document.head.appendChild(style); // This is now separate from the main style block
     }
     style.textContent = spacingStyles;
+  }
+
+  function ensureOpenLuaToolsButtonSlot(button, container, referenceBtn) {
+    if (!button) return null;
+    ensureStyles();
+
+    button.style.margin = "0";
+    button.style.marginLeft = "0";
+    button.style.marginRight = "0";
+
+    let slot = button.closest
+      ? button.closest(".openluatools-button-slot")
+      : null;
+    if (slot) return slot;
+
+    slot = document.createElement("span");
+    slot.className = "openluatools-button-slot";
+
+    if (button.parentElement) {
+      button.parentElement.insertBefore(slot, button);
+    } else if (referenceBtn && referenceBtn.after) {
+      referenceBtn.after(slot);
+    } else if (container) {
+      container.appendChild(slot);
+    }
+
+    slot.appendChild(button);
+    return slot;
   }
 
   // Function to update button text with current translations
@@ -6387,11 +6424,15 @@
 
     if (targetContainer) {
       const steamdbContainer = targetContainer;
+      const referenceBtn = isBigPicture
+        ? document.querySelector("#queueBtnFollow")
+        : steamdbContainer.querySelector("a:not(.openluatools-button)");
 
       // Status Pills Logic
       // Always update translations for existing buttons (even if not a page change)
       const existingBtn = document.querySelector(".openluatools-button");
       if (existingBtn) {
+        ensureOpenLuaToolsButtonSlot(existingBtn, steamdbContainer, referenceBtn);
         ensureTranslationsLoaded(false).then(function () {
           updateButtonTranslations();
         });
@@ -6400,10 +6441,6 @@
       // Check if button already exists to avoid duplicates
       if (!existingBtn && !window.__OpenLuaToolsButtonInserted) {
         // Create the OpenLuaTools button modeled after existing SteamDB/PCGW buttons
-        // In Big Picture mode, use queue button as reference; otherwise use first link in container
-        let referenceBtn = isBigPicture
-          ? document.querySelector("#queueBtnFollow")
-          : steamdbContainer.querySelector("a");
 
         // Use same custom button for both modes
         const openluatoolsButton = document.createElement("a");
@@ -6444,11 +6481,11 @@
             return;
           }
 
-          if (referenceBtn && referenceBtn.after) {
-            referenceBtn.after(openluatoolsButton);
-          } else {
-            steamdbContainer.appendChild(openluatoolsButton);
-          }
+          ensureOpenLuaToolsButtonSlot(
+            openluatoolsButton,
+            steamdbContainer,
+            referenceBtn,
+          );
           window.__OpenLuaToolsButtonInserted = true;
           backendLog("OpenLuaTools button inserted");
         }
@@ -7606,7 +7643,14 @@
               // Remove button since game is added (works even if popup is hidden)
               const btnEl = document.querySelector(".openluatools-button");
               if (btnEl && btnEl.parentElement) {
-                btnEl.parentElement.removeChild(btnEl);
+                const slotEl = btnEl.closest
+                  ? btnEl.closest(".openluatools-button-slot")
+                  : null;
+                if (slotEl && slotEl.parentElement) {
+                  slotEl.parentElement.removeChild(slotEl);
+                } else {
+                  btnEl.parentElement.removeChild(btnEl);
+                }
               }
             }
             if (st.status === "failed") {
