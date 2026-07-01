@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3 - 2026-07-01
+
+- Improved API availability checks so rate limits, timeouts, and server errors are reported as API failures instead of false not-found results.
+- Added direct ZIP API probing with `HEAD` plus small ranged GET fallback for sources such as Ryuu.
+- Hardened Lua and manifest downloads with operation IDs, curl timeouts/retries, archive listing validation, stale-state failure handling, and real cancel cleanup.
+
 ## 1.0.2 - 2026-06-30
 
 - Fixed Community Hub and Add via OpenLuaTools button spacing on Steam store pages.

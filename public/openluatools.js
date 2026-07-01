@@ -6887,7 +6887,28 @@
                     const available = results.filter((r) => r.available);
 
                     if (available.length === 0) {
-                      const msg = lt("Game not found on any available API.");
+                      const errored = results.filter(
+                        (r) => r && (r.status === "error" || r.error),
+                      );
+                      const msg =
+                        errored.length > 0
+                          ? lt("Error: {error}").replace(
+                              "{error}",
+                              errored
+                                .map((r) => {
+                                  const code = r.statusCode
+                                    ? " HTTP " + r.statusCode
+                                    : "";
+                                  return (
+                                    (r.name || "API") +
+                                    code +
+                                    ": " +
+                                    (r.error || "API check failed")
+                                  );
+                                })
+                                .join("; "),
+                            )
+                          : lt("Game not found on any available API.");
                       if (status) status.textContent = msg;
                       const hideBtn = overlay
                         ? overlay.querySelector(".openluatools-hide-btn")
@@ -6937,6 +6958,11 @@
                 })
                 .catch(function (err) {
                   backendLog("OpenLuaTools: CheckApisForApp promise error: " + err);
+                  if (status)
+                    status.textContent = lt("Error: {error}").replace(
+                      "{error}",
+                      (err && err.message) || "Check failed",
+                    );
                 });
             };
 
@@ -6985,19 +7011,11 @@
                   showTestPopup();
                 }
 
-                Millennium.callServerMethod(
-                  "openluatools",
-                  "StartAddViaOpenLuaToolsFromUrl",
-                  {
-                    appid,
-                    url,
-                    apiName,
-                    contentScriptQuery: "",
-                  },
-                );
-
+                let retryStarted = false;
                 const onFailedCallback = function (errMsg) {
+                  if (retryStarted) return;
                   if (index + 1 < availableSources.length) {
+                    retryStarted = true;
                     backendLog(
                       "OpenLuaTools: Fast download failed on " +
                         apiName +
@@ -7011,6 +7029,42 @@
                     }, 1500);
                   }
                 };
+
+                Millennium.callServerMethod(
+                  "openluatools",
+                  "StartAddViaOpenLuaToolsFromUrl",
+                  {
+                    appid,
+                    url,
+                    apiName,
+                    contentScriptQuery: "",
+                  },
+                ).then(function (res) {
+                  try {
+                    const payload = typeof res === "string" ? JSON.parse(res) : res;
+                    if (!payload || !payload.success) {
+                      throw new Error(
+                        (payload && payload.error) || "Download failed to start",
+                      );
+                    }
+                  } catch (err) {
+                    backendLog(
+                      "OpenLuaTools: StartAddViaOpenLuaToolsFromUrl error: " +
+                        err,
+                    );
+                    if (onFailedCallback) {
+                      onFailedCallback(err.message || "Download failed to start");
+                    }
+                  }
+                }).catch(function (err) {
+                  backendLog(
+                    "OpenLuaTools: StartAddViaOpenLuaToolsFromUrl promise error: " +
+                      err,
+                  );
+                  onFailedCallback(
+                    (err && err.message) || "Download failed to start",
+                  );
+                });
 
                 startPolling(appid, onFailedCallback);
               };
@@ -7302,6 +7356,8 @@
               // Track successful API when download/processing starts
               if (
                 (st.status === "downloading" ||
+                  st.status === "downloaded" ||
+                  st.status === "extracting" ||
                   st.status === "processing" ||
                   st.status === "installing" ||
                   st.status === "done") &&
@@ -7330,7 +7386,7 @@
                       item.style.borderColor = "#ff5c5c";
                       if (apiError.type === "timeout") {
                         apiStatus.innerHTML = `<span style="color:#ff5c5c;">${lt("Error, Timed Out")}</span><i class="fa-solid fa-clock" style="color:#ff5c5c;"></i>`;
-                      } else if (apiError.type === "error") {
+                      } else {
                         const code = apiError.code ? String(apiError.code) : "";
                         apiStatus.innerHTML = `<span style="color:#ff5c5c;">${lt("Error, Code: {code}").replace("{code}", code)}</span><i class="fa-solid fa-exclamation-triangle" style="color:#ff5c5c;"></i>`;
                       }
@@ -7413,7 +7469,7 @@
 
                   if (apiError.type === "timeout") {
                     apiStatus.innerHTML = `<span style="color:#ff5c5c;">${lt("Error, Timed Out")}</span><i class="fa-solid fa-clock" style="color:#ff5c5c;"></i>`;
-                  } else if (apiError.type === "error") {
+                  } else {
                     const code = apiError.code ? String(apiError.code) : "";
                     apiStatus.innerHTML = `<span style="color:#ff5c5c;">${lt("Error, Code: {code}").replace("{code}", code)}</span><i class="fa-solid fa-exclamation-triangle" style="color:#ff5c5c;"></i>`;
                   }
@@ -7429,6 +7485,8 @@
               );
             } else if (
               (st.status === "downloading" ||
+                st.status === "downloaded" ||
+                st.status === "extracting" ||
                 st.status === "processing" ||
                 st.status === "installing") &&
               title
@@ -7450,6 +7508,9 @@
               if (st.status === "downloading")
                 status.innerHTML =
                   dlIcon + "<span>" + lt("Downloading…") + "</span>";
+              if (st.status === "downloaded" || st.status === "extracting")
+                status.innerHTML =
+                  gearIcon + "<span>" + lt("Processing package…") + "</span>";
               if (st.status === "processing")
                 status.innerHTML =
                   gearIcon + "<span>" + lt("Processing package…") + "</span>";
@@ -7466,7 +7527,7 @@
                   "</span>";
             }
             if (
-              ["downloading", "processing", "installing"].includes(st.status)
+              ["downloading", "downloaded", "extracting", "processing", "installing"].includes(st.status)
             ) {
               // reveal progress UI (if overlay visible)
               if (wrap && wrap.style.display === "none")
@@ -7513,6 +7574,32 @@
                 : null;
               if (cancelBtn && st.status === "downloading")
                 cancelBtn.style.display = "";
+            }
+
+            if (st.status === "cancelled") {
+              if (status) status.textContent = lt("Cancelled");
+              const cancelBtn = overlay
+                ? overlay.querySelector(".openluatools-cancel-btn")
+                : null;
+              if (cancelBtn) cancelBtn.style.display = "none";
+              const hideBtn = overlay
+                ? overlay.querySelector(".openluatools-hide-btn")
+                : null;
+              if (hideBtn) {
+                hideBtn.style.display = "flex";
+                hideBtn.className = "openluatools-btn primary openluatools-hide-btn";
+                hideBtn.innerHTML =
+                  '<i class="fa-solid fa-xmark" style="margin-right:6px;"></i><span>' +
+                  lt("Close") +
+                  "</span>";
+              }
+              if (wrap) wrap.style.display = "none";
+              if (progressInfo) progressInfo.style.display = "none";
+              done = true;
+              clearInterval(timer);
+              runState.inProgress = false;
+              runState.appid = null;
+              return;
             }
 
             if (["checking content", "done"].includes(st.status)) {
@@ -7670,7 +7757,7 @@
                     item.style.borderColor = "#ff5c5c";
                     if (apiError.type === "timeout") {
                       apiStatus.innerHTML = `<span style="color:#ff5c5c;">${lt("Error, Timed Out")}</span><i class="fa-solid fa-clock" style="color:#ff5c5c;"></i>`;
-                    } else if (apiError.type === "error") {
+                    } else {
                       const code = apiError.code ? String(apiError.code) : "";
                       apiStatus.innerHTML = `<span style="color:#ff5c5c;">${lt("Error, Code: {code}").replace("{code}", code)}</span><i class="fa-solid fa-exclamation-triangle" style="color:#ff5c5c;"></i>`;
                     }

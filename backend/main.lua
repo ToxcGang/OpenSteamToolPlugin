@@ -317,8 +317,10 @@ function ReorderApis(params, contentScriptQuery)
 end
 
 function CancelAddViaOpenLuaTools(appid)
-    -- No-op cancel stub; download is synchronous in Lua
-    return json_ok({ success = true })
+    if type(appid) == "table" then appid = appid.appid end
+    local ok, res = pcall(downloads.cancel_add_via_openluatools, tonumber(appid))
+    if not ok then return json_err(res) end
+    return json_ok(res)
 end
 
 function CheckApisForApp(appid)
